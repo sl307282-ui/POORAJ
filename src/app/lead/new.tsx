@@ -1,9 +1,15 @@
+import { useAppTheme } from '../../hooks/useAppTheme';
+import { AppText } from '../../components/AppText';
+import { useThemeStore } from '../../store/themeStore';
+import { Colors } from '../../theme/colors';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Save, ChevronDown, Check } from 'lucide-react-native';
+import { ChevronLeft, Save, ChevronDown, Check, Calendar as CalendarIcon } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLeadStore } from '../../store/leadStore';
+import { FollowUpDatePicker } from '../../components/FollowUpDatePicker';
 
 const CUSTOMER_TYPES = ['Fresh Lead', 'Visited Customer', 'Existing Customer'];
 const PROFILES = ['Govt Job', 'Private Job', 'Business', 'Other'];
@@ -23,8 +29,11 @@ const INDIA_STATES = [
 ];
 
 export default function NewLeadScreen() {
+  const { mode } = useThemeStore();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const router = useRouter();
-  const { addLead } = useLeadStore();
+  const { addLead, addFollowUp } = useLeadStore();
   
   const [customerType, setCustomerType] = useState('');
   const [name, setName] = useState('');
@@ -33,8 +42,10 @@ export default function NewLeadScreen() {
   const [district, setDistrict] = useState('');
   const [state, setState] = useState('');
   const [profile, setProfile] = useState('');
+  const [customProfile, setCustomProfile] = useState('');
   const [requirement, setRequirement] = useState('');
   const [budget, setBudget] = useState('');
+  const [budgetUnit, setBudgetUnit] = useState('Lacs');
   const [propertyType, setPropertyType] = useState('');
   
   const [sizeOption, setSizeOption] = useState('');
@@ -44,6 +55,10 @@ export default function NewLeadScreen() {
   const [facing, setFacing] = useState('');
   const [location, setLocation] = useState('');
   const [loan, setLoan] = useState('');
+  
+  const [note, setNote] = useState('');
+  const [nextVisit, setNextVisit] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [expandedDropdown, setExpandedDropdown] = useState<string | null>(null);
 
@@ -55,16 +70,16 @@ export default function NewLeadScreen() {
     
     const finalSize = sizeOption === 'Custom' ? customSize : sizeOption;
 
-    await addLead({
+    const createdLead = await addLead({
       customer_type: customerType || 'Fresh Lead',
       name,
       mobile,
       address,
       district,
       state,
-      profile: profile || 'Other',
+      profile: profile === 'Other' && customProfile.trim() ? customProfile.trim() : (profile || 'Other'),
       requirement: requirement || 'Investment',
-      budget,
+      budget: budget ? `${budget} ${budgetUnit}` : '',
       property_type: propertyType || 'Plot',
       size: finalSize,
       road_size: road,
@@ -74,7 +89,38 @@ export default function NewLeadScreen() {
       status: 'Fresh',
     } as any);
 
-    router.replace('/(tabs)');
+    if (createdLead && (note.trim() || nextVisit)) {
+      await addFollowUp({
+        lead_id: createdLead.id,
+        comment: note.trim() || 'Lead created',
+        visit_date: new Date().toISOString().split('T')[0],
+        next_follow_up_date: nextVisit || null,
+        reminder_sent: false,
+      });
+    }
+
+    Alert.alert('Success', 'Lead has been saved successfully!');
+
+    setCustomerType('');
+    setName('');
+    setMobile('');
+    setAddress('');
+    setDistrict('');
+    setState('');
+    setProfile('');
+    setCustomProfile('');
+    setRequirement('');
+    setBudget('');
+    setBudgetUnit('Lacs');
+    setPropertyType('');
+    setSizeOption('');
+    setCustomSize('');
+    setRoad('');
+    setFacing('');
+    setLocation('');
+    setLoan('');
+    setNote('');
+    setNextVisit('');
   };
 
   const handleBack = () => {
@@ -93,14 +139,14 @@ export default function NewLeadScreen() {
     return (
       <View style={[styles.fieldContainer, isLast && { borderBottomWidth: 0 }, isExpanded && { zIndex: 1000 }]}>
         <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>{label}</Text>
+          <AppText style={styles.fieldLabel}>{label}</AppText>
           <View style={styles.inputBoxContainer}>
             <TouchableOpacity 
               style={styles.dropdownTriggerBox} 
               onPress={() => setExpandedDropdown(isExpanded ? null : label)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.dropdownTriggerText, isPlaceholder && styles.dropdownPlaceholder]} numberOfLines={1}>{displayValue}</Text>
+              <AppText style={[styles.dropdownTriggerText, isPlaceholder && styles.dropdownPlaceholder]} numberOfLines={1}>{displayValue}</AppText>
               <ChevronDown size={18} color="#94a3b8" style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }} />
             </TouchableOpacity>
           </View>
@@ -119,10 +165,10 @@ export default function NewLeadScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.dropdownFloatingOptionText, selected === opt && styles.dropdownFloatingOptionTextSelected]}>
+                  <AppText style={[styles.dropdownFloatingOptionText, selected === opt && styles.dropdownFloatingOptionTextSelected]}>
                     {opt}
-                  </Text>
-                  {selected === opt && <Check size={16} color="#0284c7" />}
+                  </AppText>
+                  {selected === opt && <Check size={16} color={theme.primaryDark} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -140,7 +186,7 @@ export default function NewLeadScreen() {
     return (
       <View style={[styles.fieldContainer, isLast && { borderBottomWidth: 0 }, isExpanded && { zIndex: 1000 }]}>
         <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>{label}</Text>
+          <AppText style={styles.fieldLabel}>{label}</AppText>
           <View style={styles.inputBoxContainer}>
             <View style={[styles.dropdownTriggerBox, { paddingVertical: 0 }]}>
               <TextInput
@@ -174,10 +220,10 @@ export default function NewLeadScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.dropdownFloatingOptionText, selected === opt && styles.dropdownFloatingOptionTextSelected]}>
+                  <AppText style={[styles.dropdownFloatingOptionText, selected === opt && styles.dropdownFloatingOptionTextSelected]}>
                     {opt}
-                  </Text>
-                  {selected === opt && <Check size={16} color="#0284c7" />}
+                  </AppText>
+                  {selected === opt && <Check size={16} color={theme.primaryDark} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -187,23 +233,30 @@ export default function NewLeadScreen() {
     );
   };
 
-  const renderTextInput = (label: string, value: string, onChange: (val: string) => void, placeholder: string, keyboardType: any = 'default', isLast: boolean = false, multiline: boolean = false) => {
+  const renderTextInput = (label: string, value: string, onChange: (val: string) => void, placeholder: string, keyboardType: any = 'default', isLast: boolean = false, multiline: boolean = false, suffix?: any) => {
     return (
       <View style={[styles.fieldContainer, isLast && { borderBottomWidth: 0 }]}>
         <View style={[styles.fieldRow, multiline && { minHeight: 80, alignItems: 'flex-start', paddingTop: 12 }]}>
-          <Text style={[styles.fieldLabel, multiline && { marginTop: 10 }]}>{label}</Text>
+          <AppText style={[styles.fieldLabel, multiline && { marginTop: 10 }]}>{label}</AppText>
           <View style={[styles.inputBoxContainer, multiline && { paddingVertical: 0 }]}>
-            <TextInput 
-              style={[styles.boxInput, multiline && { minHeight: 64, textAlignVertical: 'top' }]} 
-              placeholder={placeholder}
-              placeholderTextColor="#94a3b8"
-              value={value}
-              onChangeText={onChange}
-              keyboardType={keyboardType}
-              textAlign="left"
-              multiline={multiline}
-              numberOfLines={multiline ? 2 : 1}
-            />
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+              <TextInput 
+                style={[styles.boxInput, { flex: 1 }, multiline && { minHeight: 64, textAlignVertical: 'top' }]} 
+                placeholder={placeholder}
+                placeholderTextColor="#94a3b8"
+                value={value}
+                onChangeText={onChange}
+                keyboardType={keyboardType}
+                textAlign="left"
+                multiline={multiline}
+                numberOfLines={multiline ? 2 : 1}
+              />
+              {suffix && (
+                typeof suffix === 'string' ? (
+                  <AppText style={{ color: theme.text, fontWeight: '600', paddingRight: 15 }}>{suffix}</AppText>
+                ) : suffix
+              )}
+            </View>
           </View>
         </View>
       </View>
@@ -213,10 +266,10 @@ export default function NewLeadScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <ChevronLeft size={24} color="#0f172a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Lead</Text>
+        <AppText style={styles.headerTitle}>New Lead</AppText>
         <View style={{ width: 40 }} /> 
       </View>
 
@@ -235,11 +288,35 @@ export default function NewLeadScreen() {
             {renderSearchableDropdown('State', INDIA_STATES, state, setState, true)}
           </View>
 
-          <Text style={styles.sectionTitle}>Lead Preferences</Text>
+          <AppText style={styles.sectionTitle}>Lead Preferences</AppText>
           <View style={[styles.formSection, (expandedDropdown === 'Profile' || expandedDropdown === 'Requirement' || expandedDropdown === 'Property Type' || expandedDropdown === 'Size (sq yd)') && { zIndex: 1000 }]}>
             {renderDropdown('Profile', PROFILES, profile, setProfile)}
+            {profile === 'Other' && renderTextInput('Specify Profile', customProfile, setCustomProfile, 'Enter profile details')}
             {renderDropdown('Requirement', REQUIREMENTS, requirement, setRequirement)}
-            {renderTextInput('Budget', budget, setBudget, 'e.g. 50 Lacs')}
+            {renderTextInput('Budget', budget, (val) => setBudget(val.replace(/[^0-9.]/g, '')), 'e.g. 50', 'numeric', false, false, 
+              <View style={{ zIndex: expandedDropdown === 'BudgetUnit' ? 2000 : 1 }}>
+                <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 15 }} 
+                  onPress={() => setExpandedDropdown(expandedDropdown === 'BudgetUnit' ? null : 'BudgetUnit')}
+                >
+                  <AppText style={{ color: theme.text, fontWeight: '600' }}>{budgetUnit}</AppText>
+                  <ChevronDown size={14} color="#0f172a" style={{ marginLeft: 4 }} />
+                </TouchableOpacity>
+                {expandedDropdown === 'BudgetUnit' && (
+                  <View style={{ position: 'absolute', top: 30, right: 10, backgroundColor: theme.surface, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, elevation: 10, zIndex: 2000, width: 80 }}>
+                    {['Lacs', 'Cr'].map((u, i) => (
+                      <TouchableOpacity 
+                        key={u} 
+                        style={{ padding: 12, borderBottomWidth: i === 0 ? 1 : 0, borderBottomColor: '#f1f5f9' }}
+                        onPress={() => { setBudgetUnit(u); setExpandedDropdown(null); }}
+                      >
+                        <AppText style={{ textAlign: 'center', fontWeight: budgetUnit === u ? '700' : '500', color: budgetUnit === u ? theme.primaryDark : theme.textSecondary }}>{u}</AppText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
             {renderDropdown('Property Type', PROPERTY_TYPES, propertyType, setPropertyType)}
             {renderDropdown('Size (sq yd)', SIZES, sizeOption, setSizeOption, sizeOption !== 'Custom')}
             
@@ -248,7 +325,7 @@ export default function NewLeadScreen() {
             )}
           </View>
 
-          <Text style={styles.sectionTitle}>Property Details</Text>
+          <AppText style={styles.sectionTitle}>Property Details</AppText>
           <View style={[styles.formSection, (expandedDropdown === 'Road Size' || expandedDropdown === 'Facing' || expandedDropdown === 'Bank Loan') && { zIndex: 1000 }]}>
             {renderDropdown('Road Size', ROADS, road, setRoad)}
             {renderDropdown('Facing', FACINGS, facing, setFacing)}
@@ -256,27 +333,59 @@ export default function NewLeadScreen() {
             {renderDropdown('Bank Loan', LOAN_OPTIONS, loan, setLoan, true)}
           </View>
 
+
+          <AppText style={styles.sectionTitle}>Initial Follow-up (Optional)</AppText>
+          <View style={[styles.formSection, { zIndex: 100 }]}>
+            {renderTextInput('Notes / Comments', note, setNote, 'Add any initial remarks about this lead', 'default', false, true)}
+            <View style={[styles.fieldContainer, { borderBottomWidth: 0 }]}>
+              <View style={styles.fieldRow}>
+                <AppText style={styles.fieldLabel}>Next Follow-up</AppText>
+                <View style={styles.inputBoxContainer}>
+                  <TouchableOpacity 
+                    style={[styles.dropdownTriggerBox, !nextVisit && { backgroundColor: theme.surfaceLight }]} 
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <AppText style={[styles.dropdownTriggerText, !nextVisit && { color: theme.icon }]}>
+                      {nextVisit ? `📅 ${new Date(nextVisit).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Select Date'}
+                    </AppText>
+                    <CalendarIcon size={18} color="#94a3b8" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+
           <TouchableOpacity style={styles.saveButtonContainer} onPress={handleSave} activeOpacity={0.8}>
             <LinearGradient
-              colors={['#0ea5e9', '#0284c7']}
+              colors={[theme.primary, theme.primaryDark]}
               style={styles.saveButton}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
               <Save size={20} color="#ffffff" style={{ marginRight: 8 }} />
-              <Text style={styles.saveButtonText}>Save Lead</Text>
+              <AppText style={styles.saveButtonText}>Save Lead</AppText>
             </LinearGradient>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <FollowUpDatePicker
+        visible={showDatePicker}
+        initialDate={nextVisit}
+        onClose={() => setShowDatePicker(false)}
+        onSave={(date, time) => {
+          setNextVisit(date);
+          setShowDatePicker(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(theme: any) { return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
   },
   header: {
     flexDirection: 'row',
@@ -284,7 +393,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -297,7 +406,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
   },
   formContainer: {
     padding: 16,
@@ -306,7 +415,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: theme.icon,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginTop: 28,
@@ -314,7 +423,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   formSection: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -326,7 +435,7 @@ const styles = StyleSheet.create({
   fieldContainer: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
   },
   fieldRow: {
     flexDirection: 'row',
@@ -338,7 +447,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 15,
     fontWeight: '400',
-    color: '#1e293b',
+    color: theme.text,
     flex: 0.45,
     paddingRight: 8,
   },
@@ -349,32 +458,32 @@ const styles = StyleSheet.create({
   },
   boxInput: {
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#0f172a',
-    backgroundColor: '#f8fafc',
+    color: theme.text,
+    backgroundColor: theme.surfaceLight,
   },
   dropdownTriggerBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
   },
   dropdownTriggerText: {
     fontSize: 14,
-    color: '#0f172a',
+    color: theme.text,
     flexShrink: 1,
   },
   dropdownPlaceholder: {
-    color: '#cbd5e1',
+    color: theme.divider,
   },
   dropdownFloatingBody: {
     position: 'absolute',
@@ -382,9 +491,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     right: 16,
     width: '55%',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: '#94a3b8',
+    borderColor: theme.icon,
     borderRadius: 8,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 8 },
@@ -404,7 +513,7 @@ const styles = StyleSheet.create({
   },
   dropdownFloatingOptionText: {
     fontSize: 14,
-    color: '#475569',
+    color: theme.textSecondary,
   },
   dropdownFloatingOptionTextSelected: {
     color: '#0284c7',
@@ -428,8 +537,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   saveButtonText: {
-    color: '#ffffff',
+    color: theme.surface,
     fontSize: 17,
     fontWeight: '700',
   },
 });
+}

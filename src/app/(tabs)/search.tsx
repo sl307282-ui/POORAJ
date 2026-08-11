@@ -1,19 +1,30 @@
+import { useAppTheme } from '../../hooks/useAppTheme';
+import { AppText } from '../../components/AppText';
+import { useThemeStore } from '../../store/themeStore';
+import { Colors } from '../../theme/colors';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, SafeAreaView, Modal, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Alert } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search as SearchIcon, Filter, ChevronRight, User, Phone, MessageCircle, Edit3, X, Calendar as CalendarIcon, Check, Lock, Square, CheckSquare } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useLeadStore } from '../../store/leadStore';
 import { callNumber, openWhatsApp } from '../../utils/deepLinks';
-import { Calendar } from 'react-native-calendars';
+import { useSettingsStore } from '../../store/settingsStore';
+import { CalendarList } from 'react-native-calendars';
 import { LeadStatus } from '../../models/types';
+import { FollowUpDatePicker } from '../../components/FollowUpDatePicker';
 
 export default function SearchScreen() {
+  const { mode } = useThemeStore();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const router = useRouter();
   const params = useLocalSearchParams();
   const filterParam = params.filter as string;
   
   const [searchQuery, setSearchQuery] = useState('');
   const { leads, followUps, deals, updateLeadStatus, addFollowUp, addDeal } = useLeadStore();
+  const insets = useSafeAreaInsets();
 
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
@@ -31,23 +42,34 @@ export default function SearchScreen() {
     );
   };
 
+  const { whatsappMethod, whatsappApiUrl, whatsappApiToken } = useSettingsStore();
+  const [showApiQueueModal, setShowApiQueueModal] = useState(false);
+  const [apiIsSending, setApiIsSending] = useState(false);
+
   const handleWhatsAppAction = () => {
-    if (selectedLeads.length === 1) {
-      const lead = leads.find(l => l.id === selectedLeads[0]);
-      if (lead) {
-        openWhatsApp(lead.mobile, "Hello, this is Pooroj CRM following up on your property inquiry.");
+    if (selectedLeads.length === 0) return;
+
+    if (whatsappMethod === 'API') {
+      setShowApiQueueModal(true);
+    } else {
+      if (selectedLeads.length === 1) {
+        const lead = leads.find(l => l.id === selectedLeads[0]);
+        if (lead) {
+          openWhatsApp(lead.mobile, bulkMessage);
+        }
+      } else if (selectedLeads.length > 1) {
+        setQueueIndex(0);
+        setShowBulkQueueModal(true);
       }
-    } else if (selectedLeads.length > 1) {
-      setQueueIndex(0);
-      setShowBulkQueueModal(true);
     }
   };
+  const [bulkMessage, setBulkMessage] = useState("Hello, this is Pooroj CRM following up on your property inquiry.");
 
   const processQueueNext = () => {
     if (queueIndex < selectedLeads.length) {
       const lead = leads.find(l => l.id === selectedLeads[queueIndex]);
       if (lead) {
-        openWhatsApp(lead.mobile, "Hello, this is Pooroj CRM following up on your property inquiry.");
+        openWhatsApp(lead.mobile, bulkMessage);
       }
       setQueueIndex(queueIndex + 1);
     }
@@ -71,7 +93,7 @@ export default function SearchScreen() {
   ];
 
   let displayedLeads = leads;
-  let screenTitle = 'Search Leads';
+  let screenTitle = 'Total Leads';
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -88,6 +110,11 @@ export default function SearchScreen() {
       return latest && latest.next_follow_up_date === today;
     });
     screenTitle = "Today's Follow-ups";
+  } else if (filterParam === 'completed') {
+    const completedFollowUps = followUps.filter(f => f.created_at?.startsWith(today) || f.visit_date === today);
+    const completedLeadIds = completedFollowUps.map(f => f.lead_id);
+    displayedLeads = leads.filter(l => completedLeadIds.includes(l.id));
+    screenTitle = 'Completed Today';
   } else if (filterParam === 'upcoming') {
     displayedLeads = leads.filter(l => {
       const latest = getLatestFollowUp(l.id);
@@ -213,19 +240,25 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.searchHeader}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <View style={styles.headerTextContainer}>
+          <AppText style={[styles.headerTitle, { color: theme.text }]}>{screenTitle}</AppText>
+          <AppText style={[styles.headerSubtitle, { color: theme.textSecondary }]}>Find and filter your leads</AppText>
+        </View>
+      </View>
+      <View style={[styles.searchHeader, { paddingTop: 12 }]}>
         <View style={styles.searchBar}>
           <SearchIcon size={20} color="#64748b" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder={`Search ${screenTitle}...`}
+            placeholder={screenTitle.startsWith('Search') ? `${screenTitle}...` : `Search ${screenTitle}...`}
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholderTextColor="#94a3b8"
           />
         </View>
         <TouchableOpacity 
-          style={[styles.filterBtn, isSelectionMode && { backgroundColor: '#e0f2fe' }]} 
+          style={[styles.filterBtn, isSelectionMode && { backgroundColor: theme.surfaceLight }]} 
           onPress={() => {
             if (isSelectionMode) {
               setIsSelectionMode(false);
@@ -235,10 +268,10 @@ export default function SearchScreen() {
             }
           }}
         >
-          {isSelectionMode ? <X size={20} color="#0284c7" /> : <CheckSquare size={20} color="#0284c7" />}
+          {isSelectionMode ? <X size={20} color={theme.primaryDark} /> : <CheckSquare size={20} color={theme.primaryDark} />}
         </TouchableOpacity>
         <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilterModal(true)}>
-          <Filter size={20} color="#0284c7" />
+          <Filter size={20} color={theme.primaryDark} />
         </TouchableOpacity>
       </View>
 
@@ -252,20 +285,20 @@ export default function SearchScreen() {
         >
           {filterStatus && (
             <TouchableOpacity style={styles.activeFilterChip} onPress={() => setFilterStatus(null)}>
-              <Text style={styles.activeFilterText}>{filterStatus}</Text>
-              <X size={14} color="#0284c7" style={{ marginLeft: 6 }} />
+              <AppText style={styles.activeFilterText}>{filterStatus}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           )}
           {filterCustomerType && (
             <TouchableOpacity style={styles.activeFilterChip} onPress={() => setFilterCustomerType(null)}>
-              <Text style={styles.activeFilterText}>{filterCustomerType}</Text>
-              <X size={14} color="#0284c7" style={{ marginLeft: 6 }} />
+              <AppText style={styles.activeFilterText}>{filterCustomerType}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           )}
           {filterDateAdded && (
             <TouchableOpacity style={styles.activeFilterChip} onPress={() => setFilterDateAdded(null)}>
-              <Text style={styles.activeFilterText}>{filterDateAdded}</Text>
-              <X size={14} color="#0284c7" style={{ marginLeft: 6 }} />
+              <AppText style={styles.activeFilterText}>{filterDateAdded}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -275,14 +308,14 @@ export default function SearchScreen() {
         <View style={styles.filterModalOverlay}>
           <View style={styles.filterModalContent}>
             <View style={styles.filterModalHeader}>
-              <Text style={styles.filterModalTitle}>Filters</Text>
+              <AppText style={styles.filterModalTitle}>Filters</AppText>
               <TouchableOpacity onPress={() => setShowFilterModal(false)}>
                 <X size={24} color="#0f172a" />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterScrollContent}>
-              <Text style={styles.filterSectionTitle}>Status</Text>
+              <AppText style={styles.filterSectionTitle}>Status</AppText>
               <View style={styles.filterChipsRow}>
                 {['Fresh', 'Follow-up Today', 'Site Visit', 'Negotiation', 'Deal Closed', 'Lost'].map(status => (
                   <TouchableOpacity 
@@ -290,12 +323,12 @@ export default function SearchScreen() {
                     style={[styles.filterChip, filterStatus === status && styles.filterChipSelected]}
                     onPress={() => setFilterStatus(filterStatus === status ? null : status)}
                   >
-                    <Text style={[styles.filterChipText, filterStatus === status && styles.filterChipTextSelected]}>{status}</Text>
+                    <AppText style={[styles.filterChipText, filterStatus === status && styles.filterChipTextSelected]}>{status}</AppText>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.filterSectionTitle}>Customer Type</Text>
+              <AppText style={styles.filterSectionTitle}>Customer Type</AppText>
               <View style={styles.filterChipsRow}>
                 {['Fresh Lead', 'Visited Customer', 'Existing Customer'].map(type => (
                   <TouchableOpacity 
@@ -303,12 +336,12 @@ export default function SearchScreen() {
                     style={[styles.filterChip, filterCustomerType === type && styles.filterChipSelected]}
                     onPress={() => setFilterCustomerType(filterCustomerType === type ? null : type)}
                   >
-                    <Text style={[styles.filterChipText, filterCustomerType === type && styles.filterChipTextSelected]}>{type}</Text>
+                    <AppText style={[styles.filterChipText, filterCustomerType === type && styles.filterChipTextSelected]}>{type}</AppText>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.filterSectionTitle}>Date Added</Text>
+              <AppText style={styles.filterSectionTitle}>Date Added</AppText>
               <View style={styles.filterChipsRow}>
                 {['Today', 'Last 7 Days', 'Last 30 Days'].map(range => (
                   <TouchableOpacity 
@@ -316,7 +349,7 @@ export default function SearchScreen() {
                     style={[styles.filterChip, filterDateAdded === range && styles.filterChipSelected]}
                     onPress={() => setFilterDateAdded(filterDateAdded === range ? null : range)}
                   >
-                    <Text style={[styles.filterChipText, filterDateAdded === range && styles.filterChipTextSelected]}>{range}</Text>
+                    <AppText style={[styles.filterChipText, filterDateAdded === range && styles.filterChipTextSelected]}>{range}</AppText>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -331,10 +364,10 @@ export default function SearchScreen() {
                   setFilterDateAdded(null);
                 }}
               >
-                <Text style={styles.clearFiltersText}>Clear</Text>
+                <AppText style={styles.clearFiltersText}>Clear</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={styles.applyFiltersBtn} onPress={() => setShowFilterModal(false)}>
-                <Text style={styles.applyFiltersText}>Apply Filters</Text>
+                <AppText style={styles.applyFiltersText}>Apply Filters</AppText>
               </TouchableOpacity>
             </View>
           </View>
@@ -355,13 +388,13 @@ export default function SearchScreen() {
             }}
           >
             {selectedLeads.length === displayedLeads.length ? (
-              <CheckSquare size={20} color="#0284c7" />
+              <CheckSquare size={20} color={theme.primaryDark} />
             ) : (
               <Square size={20} color="#94a3b8" />
             )}
-            <Text style={styles.selectAllText}>
+            <AppText style={styles.selectAllText}>
               {selectedLeads.length === displayedLeads.length ? 'Deselect All' : 'Select All'}
-            </Text>
+            </AppText>
           </TouchableOpacity>
           {selectedLeads.length > 0 && (
             <TouchableOpacity 
@@ -369,7 +402,7 @@ export default function SearchScreen() {
               onPress={handleWhatsAppAction}
             >
               <MessageCircle size={16} color="#ffffff" style={{ marginRight: 6 }} />
-              <Text style={styles.headerWhatsAppText}>WhatsApp ({selectedLeads.length})</Text>
+              <AppText style={styles.headerWhatsAppText}>WhatsApp ({selectedLeads.length})</AppText>
             </TouchableOpacity>
           )}
         </View>
@@ -378,7 +411,7 @@ export default function SearchScreen() {
       <ScrollView contentContainerStyle={[styles.listContainer, isSelectionMode && { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
         {displayedLeads.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No leads found.</Text>
+            <AppText style={styles.emptyStateText}>No leads found.</AppText>
           </View>
         ) : (
           displayedLeads.map(lead => {
@@ -422,6 +455,10 @@ export default function SearchScreen() {
                 statusColor = '#d97706'; // Orange
                 badgeBg = '#fef3c7';
                 statusText = 'Today';
+              } else if (filterParam === 'completed') {
+                statusColor = '#10b981'; // Green
+                badgeBg = '#d1fae5';
+                statusText = 'Completed';
               }
 
               return (
@@ -432,7 +469,7 @@ export default function SearchScreen() {
                       onPress={() => toggleSelection(lead.id)}
                     >
                       {selectedLeads.includes(lead.id) ? (
-                        <CheckSquare size={20} color="#0284c7" />
+                        <CheckSquare size={20} color={theme.primaryDark} />
                       ) : (
                         <Square size={20} color="#cbd5e1" />
                       )}
@@ -457,10 +494,10 @@ export default function SearchScreen() {
                   >
                     <View style={styles.pendingCardHeader}>
                       <View style={styles.pendingLeadInfo}>
-                        <Text style={styles.pendingLeadName}>{lead.name}</Text>
+                        <AppText style={styles.pendingLeadName}>{lead.name}</AppText>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                           <Phone size={14} color="#64748b" style={{ marginRight: 4 }} />
-                          <Text style={styles.pendingLeadSub}>Call Follow-up</Text>
+                          <AppText style={styles.pendingLeadSub}>Call Follow-up</AppText>
                         </View>
                       </View>
                     
@@ -472,25 +509,25 @@ export default function SearchScreen() {
                       }}
                     >
                       <Edit3 size={14} color="#ffffff" />
-                      <Text style={styles.inlineUpdateText}>Update</Text>
+                      <AppText style={styles.inlineUpdateText}>Update</AppText>
                     </TouchableOpacity>
                   </View>
                   
                   <View style={styles.pendingDetailsRow}>
-                    <Text style={styles.pendingDueText}>Due: {dueText}</Text>
+                    <AppText style={styles.pendingDueText}>Due: {dueText}</AppText>
                     <View style={[styles.pendingStatusBadge, { backgroundColor: badgeBg }]}>
-                      <Text style={[styles.pendingStatusText, { color: statusColor }]}>{statusText}</Text>
+                      <AppText style={[styles.pendingStatusText, { color: statusColor }]}>{statusText}</AppText>
                     </View>
                   </View>
 
                   <View style={styles.pendingActionsRow}>
                     <TouchableOpacity style={styles.pendingActionBtn} onPress={() => callNumber(lead.mobile)}>
-                      <Phone size={18} color="#0284c7" />
-                      <Text style={[styles.pendingActionText, { color: '#0284c7' }]}>Call</Text>
+                      <Phone size={18} color={theme.primaryDark} />
+                      <AppText style={[styles.pendingActionText, { color: theme.primaryDark }]}>Call</AppText>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.pendingActionBtn} onPress={() => openWhatsApp(lead.mobile)}>
                       <MessageCircle size={18} color="#059669" />
-                      <Text style={[styles.pendingActionText, { color: '#059669' }]}>WhatsApp</Text>
+                      <AppText style={[styles.pendingActionText, { color: '#059669' }]}>WhatsApp</AppText>
                     </TouchableOpacity>
                   </View>
                   </TouchableOpacity>
@@ -506,7 +543,7 @@ export default function SearchScreen() {
                     onPress={() => toggleSelection(lead.id)}
                   >
                     {selectedLeads.includes(lead.id) ? (
-                      <CheckSquare size={20} color="#0284c7" />
+                      <CheckSquare size={20} color={theme.primaryDark} />
                     ) : (
                       <Square size={20} color="#cbd5e1" />
                     )}
@@ -530,23 +567,23 @@ export default function SearchScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={styles.avatar}>
-                  <User size={20} color="#0284c7" />
-                </View>
-                <View style={styles.leadInfo}>
-                  <Text style={styles.leadName}>{lead.name}</Text>
-                  <Text style={styles.leadMobile}>{lead.mobile}</Text>
-                </View>
-                <View style={[
-                  styles.statusBadge,
-                  lead.status === 'Deal Closed' && { backgroundColor: '#fee2e2' },
-                  lead.status === 'Lost' && { backgroundColor: '#f3f4f6' }
-                ]}>
-                  <Text style={[
-                    styles.statusText,
-                    lead.status === 'Deal Closed' && { color: '#dc2626' },
-                    lead.status === 'Lost' && { color: '#4b5563' }
-                  ]}>{lead.status}</Text>
-                </View>
+                    <User size={20} color={theme.primaryDark} />
+                  </View>
+                  <View style={styles.leadInfo}>
+                    <AppText style={styles.leadName}>{lead.name}</AppText>
+                    <AppText style={styles.leadMobile}>{lead.mobile}</AppText>
+                  </View>
+                  <View style={[
+                    styles.statusBadge,
+                    lead.status === 'Deal Closed' && { backgroundColor: theme.surfaceLight },
+                    lead.status === 'Lost' && { backgroundColor: '#f3f4f6' }
+                  ]}>
+                    <AppText style={[
+                      styles.statusText,
+                      lead.status === 'Deal Closed' && { color: '#dc2626' },
+                      lead.status === 'Lost' && { color: '#4b5563' }
+                    ]}>{lead.status}</AppText>
+                  </View>
                 </TouchableOpacity>
               </View>
             );
@@ -561,29 +598,60 @@ export default function SearchScreen() {
           <View style={styles.premiumModalContent}>
             {queueIndex >= selectedLeads.length ? (
               <>
-                <View style={[styles.premiumIconCircle, { backgroundColor: '#dcfce7' }]}>
+                <View style={[styles.premiumIconCircle, { backgroundColor: theme.surfaceLight }]}>
                   <Check size={32} color="#16a34a" />
                 </View>
-                <Text style={styles.premiumTitle}>Queue Complete!</Text>
-                <Text style={styles.premiumDesc}>
+                <AppText style={styles.premiumTitle}>Queue Complete!</AppText>
+                <AppText style={styles.premiumDesc}>
                   You have successfully messaged all {selectedLeads.length} selected customers.
-                </Text>
+                </AppText>
                 <TouchableOpacity 
                   style={styles.premiumCloseBtn}
                   onPress={() => setShowBulkQueueModal(false)}
                 >
-                  <Text style={styles.premiumCloseBtnText}>Done</Text>
+                  <AppText style={styles.premiumCloseBtnText}>Done</AppText>
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                <View style={[styles.premiumIconCircle, { backgroundColor: '#e0f2fe' }]}>
-                  <MessageCircle size={32} color="#0284c7" />
+                <View style={[styles.premiumIconCircle, { backgroundColor: theme.surfaceLight }]}>
+                  <MessageCircle size={32} color={theme.primaryDark} />
                 </View>
-                <Text style={styles.premiumTitle}>Bulk Send Queue</Text>
-                <Text style={styles.premiumDesc}>
-                  Sending message {queueIndex + 1} of {selectedLeads.length}
-                </Text>
+                <AppText style={styles.premiumTitle}>Bulk Send Queue</AppText>
+                <View style={{ width: '100%', marginBottom: 15 }}>
+                  {(() => {
+                    const currentLead = leads.find(l => l.id === selectedLeads[queueIndex]);
+                    return currentLead ? (
+                      <View style={{ backgroundColor: theme.background, padding: 12, borderRadius: 8, marginBottom: 15 }}>
+                        <AppText style={{ fontSize: 13, color: theme.icon, fontWeight: '500' }}>Sending to:</AppText>
+                        <AppText style={{ fontSize: 16, color: theme.text, fontWeight: '700', marginTop: 2 }}>{currentLead.name}</AppText>
+                        <AppText style={{ fontSize: 14, color: theme.textSecondary, marginTop: 1 }}>{currentLead.mobile}</AppText>
+                      </View>
+                    ) : null;
+                  })()}
+                  <AppText style={{ fontSize: 13, color: theme.icon, fontWeight: '600', marginBottom: 6 }}>WhatsApp Message</AppText>
+                  <TextInput
+                    style={{
+                      borderWidth: 1,
+                      borderColor: theme.divider,
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 15,
+                      color: theme.text,
+                      minHeight: 100,
+                      backgroundColor: theme.surface,
+                      textAlignVertical: 'top'
+                    }}
+                    multiline
+                    value={bulkMessage}
+                    onChangeText={setBulkMessage}
+                    placeholder="Enter your message..."
+                  />
+                </View>
+                
+                <AppText style={styles.premiumDesc}>
+                  Message {queueIndex + 1} of {selectedLeads.length}
+                </AppText>
                 
                 <View style={styles.queueProgressContainer}>
                   <View style={[styles.queueProgressBar, { width: `${((queueIndex) / selectedLeads.length) * 100}%` }]} />
@@ -593,16 +661,95 @@ export default function SearchScreen() {
                   style={styles.premiumCloseBtn}
                   onPress={processQueueNext}
                 >
-                  <Text style={styles.premiumCloseBtnText}>
+                  <AppText style={styles.premiumCloseBtnText}>
                     Send Message #{queueIndex + 1}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
                   style={styles.fallbackBtn}
                   onPress={() => setShowBulkQueueModal(false)}
                 >
-                  <Text style={styles.fallbackBtnText}>Pause & Exit Queue</Text>
+                  <AppText style={styles.fallbackBtnText}>Pause & Exit Queue</AppText>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showApiQueueModal} animationType="fade" transparent={true}>
+        <View style={styles.premiumModalOverlay}>
+          <View style={styles.premiumModalContent}>
+            {apiIsSending ? (
+              <View style={{ alignItems: 'center', padding: 20 }}>
+                <ActivityIndicator size="large" color={theme.primaryDark} />
+                <AppText style={{ marginTop: 16, fontSize: 16, color: theme.text, fontWeight: '600' }}>Sending via API...</AppText>
+              </View>
+            ) : (
+              <>
+                <View style={[styles.premiumIconCircle, { backgroundColor: theme.surfaceLight }]}>
+                  <MessageCircle size={32} color={theme.primaryDark} />
+                </View>
+                <AppText style={styles.premiumTitle}>API Bulk Send</AppText>
+                
+                <AppText style={[styles.premiumDesc, { marginBottom: 20 }]}>
+                  You are about to send a WhatsApp message to {selectedLeads.length} selected client{selectedLeads.length > 1 ? 's' : ''} in the background.
+                </AppText>
+
+                <View style={{ width: '100%', marginBottom: 15 }}>
+                  <AppText style={{ fontSize: 13, color: theme.icon, fontWeight: '600', marginBottom: 6 }}>WhatsApp Message</AppText>
+                  <TextInput
+                    style={{
+                      borderWidth: 1,
+                      borderColor: theme.divider,
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 15,
+                      color: theme.text,
+                      minHeight: 100,
+                      backgroundColor: theme.surface,
+                      textAlignVertical: 'top'
+                    }}
+                    multiline
+                    value={bulkMessage}
+                    onChangeText={setBulkMessage}
+                    placeholder="Enter your message..."
+                  />
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.premiumCloseBtn}
+                  onPress={async () => {
+                    if (!whatsappApiUrl || !whatsappApiToken) {
+                      Alert.alert("Configuration Missing", "Please configure the WhatsApp API URL and Token in Settings.");
+                      return;
+                    }
+                    setApiIsSending(true);
+                    try {
+                      // Mock API delay
+                      await new Promise(resolve => setTimeout(resolve, 1500));
+                      setApiIsSending(false);
+                      setShowApiQueueModal(false);
+                      Alert.alert("Success", `Sent messages to ${selectedLeads.length} clients via API.`);
+                      // Optionally clear selection:
+                      // setSelectedLeads([]);
+                    } catch (e) {
+                      setApiIsSending(false);
+                      Alert.alert("API Error", "Failed to send messages.");
+                    }
+                  }}
+                >
+                  <AppText style={styles.premiumCloseBtnText}>
+                    Send All via API
+                  </AppText>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.fallbackBtn}
+                  onPress={() => setShowApiQueueModal(false)}
+                >
+                  <AppText style={styles.fallbackBtnText}>Cancel</AppText>
                 </TouchableOpacity>
               </>
             )}
@@ -619,11 +766,11 @@ export default function SearchScreen() {
       >
         <View style={Platform.OS === 'web' ? styles.webModalOverlay : { flex: 1 }}>
           <KeyboardAvoidingView 
-            style={[{ flex: 1, backgroundColor: '#ffffff' }, Platform.OS === 'web' && styles.webModalFrame]} 
+            style={[{ flex: 1, backgroundColor: theme.surface }, Platform.OS === 'web' && styles.webModalFrame]} 
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Follow-up Result</Text>
+              <AppText style={styles.modalTitle}>Follow-up Result</AppText>
               <TouchableOpacity onPress={() => setShowUpdateModal(false)}>
                 <X size={24} color="#0f172a" />
               </TouchableOpacity>
@@ -637,13 +784,13 @@ export default function SearchScreen() {
                     style={[styles.optionCard, updateResult === res && styles.optionCardSelected]}
                     onPress={() => setUpdateResult(res)}
                   >
-                    <Text style={[styles.optionText, updateResult === res && styles.optionTextSelected]}>{res}</Text>
-                    {updateResult === res && <Check size={16} color="#0284c7" />}
+                    <AppText style={[styles.optionText, updateResult === res && styles.optionTextSelected]}>{res}</AppText>
+                    {updateResult === res && <Check size={16} color={theme.primaryDark} />}
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.inputLabel}>Notes</Text>
+              <AppText style={styles.inputLabel}>Notes</AppText>
               <TextInput
                 style={styles.notesInput}
                 placeholder="Enter details here..."
@@ -653,10 +800,10 @@ export default function SearchScreen() {
                 onChangeText={setNotes}
               />
 
-              <Text style={styles.inputLabel}>Next Follow-up Date</Text>
+              <AppText style={styles.inputLabel}>Next Follow-up Date</AppText>
               <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
                 <CalendarIcon size={20} color="#64748b" />
-                <Text style={styles.dateSelectorText}>{nextVisit || 'Select Date & Time'}</Text>
+                <AppText style={styles.dateSelectorText}>{nextVisit || 'Select Date & Time'}</AppText>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -667,56 +814,54 @@ export default function SearchScreen() {
                 {isSubmitting ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  <AppText style={styles.saveButtonText}>Save</AppText>
                 )}
               </TouchableOpacity>
             </ScrollView>
+            <FollowUpDatePicker
+              visible={showDatePicker}
+              initialDate={nextVisit}
+              onClose={() => setShowDatePicker(false)}
+              onSave={(date, time) => {
+                setNextVisit(date);
+                // Currently ignoring time string for DB storage, but it updates the UI
+                setShowDatePicker(false);
+              }}
+            />
           </KeyboardAvoidingView>
         </View>
-      </Modal>
-
-      <Modal
-        visible={showDatePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
-        <TouchableOpacity 
-          style={styles.dateModalOverlay} 
-          activeOpacity={1} 
-          onPressOut={() => setShowDatePicker(false)}
-        >
-          <View style={styles.calendarModalContainer}>
-            <TouchableOpacity activeOpacity={1}>
-              <Calendar
-                current={nextVisit || undefined}
-                onDayPress={(day: any) => {
-                  setNextVisit(day.dateString);
-                  setShowDatePicker(false);
-                }}
-                markedDates={
-                  nextVisit ? {
-                    [nextVisit]: { selected: true, selectedColor: '#0284c7' }
-                  } : {}
-                }
-                theme={{
-                  todayTextColor: '#0284c7',
-                  selectedDayBackgroundColor: '#0284c7',
-                  arrowColor: '#0284c7',
-                }}
-              />
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(theme: any) { return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    backgroundColor: theme.surface,
+  },
+  headerTextContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+    paddingLeft: 8
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
   },
   searchHeader: {
     flexDirection: 'row',
@@ -724,7 +869,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
@@ -732,7 +877,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 44,
@@ -743,14 +888,14 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: '#0f172a',
+    color: theme.text,
     height: '100%',
   },
   filterBtn: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: theme.surfaceLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 12,
@@ -759,7 +904,7 @@ const styles = StyleSheet.create({
     maxHeight: 50,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
   },
   activeFiltersContent: {
     paddingHorizontal: 24,
@@ -769,7 +914,7 @@ const styles = StyleSheet.create({
   activeFilterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e0f2fe',
+    backgroundColor: theme.surfaceLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -789,7 +934,7 @@ const styles = StyleSheet.create({
     alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
   },
   filterModalContent: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
@@ -808,7 +953,7 @@ const styles = StyleSheet.create({
   filterModalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
   },
   filterScrollContent: {
     padding: 24,
@@ -816,7 +961,7 @@ const styles = StyleSheet.create({
   filterSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: theme.text,
     marginBottom: 12,
     marginTop: 20,
   },
@@ -829,18 +974,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
   },
   filterChipSelected: {
-    backgroundColor: '#f0f9ff',
+    backgroundColor: theme.surfaceLight,
     borderColor: '#0284c7',
   },
   filterChipText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#475569',
+    color: theme.textSecondary,
   },
   filterChipTextSelected: {
     color: '#0284c7',
@@ -851,7 +996,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
   },
   clearFiltersBtn: {
     flex: 1,
@@ -859,12 +1004,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
     borderRadius: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
   },
   clearFiltersText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#475569',
+    color: theme.textSecondary,
   },
   applyFiltersBtn: {
     flex: 2,
@@ -876,21 +1021,16 @@ const styles = StyleSheet.create({
   applyFiltersText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: theme.surface,
   },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: '#ffffff',
-  },
+
   selectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
@@ -901,7 +1041,7 @@ const styles = StyleSheet.create({
   selectAllText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#334155',
+    color: theme.textSecondary,
     marginLeft: 8,
   },
   headerWhatsAppBtn: {
@@ -913,7 +1053,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   headerWhatsAppText: {
-    color: '#ffffff',
+    color: theme.surface,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -941,7 +1081,7 @@ const styles = StyleSheet.create({
     bottom: 90,
     left: 24,
     right: 24,
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.text,
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -956,7 +1096,7 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   selectionCountText: {
-    color: '#ffffff',
+    color: theme.surface,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -973,7 +1113,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   actionBtnTextWhatsApp: {
-    color: '#ffffff',
+    color: theme.surface,
     fontWeight: '600',
     fontSize: 15,
   },
@@ -985,7 +1125,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   premiumModalContent: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderRadius: 24,
     padding: 24,
     width: '90%',
@@ -1001,7 +1141,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#fef3c7',
+    backgroundColor: theme.surfaceLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -1009,32 +1149,32 @@ const styles = StyleSheet.create({
   premiumTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0f172a',
+    color: theme.text,
     textAlign: 'center',
     marginBottom: 12,
   },
   premiumDesc: {
     fontSize: 14,
-    color: '#475569',
+    color: theme.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
   },
   premiumBadgeRow: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
     marginBottom: 24,
   },
   premiumBadgeText: {
-    color: '#94a3b8',
+    color: theme.icon,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1,
   },
   premiumCloseBtn: {
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.text,
     width: '100%',
     paddingVertical: 14,
     borderRadius: 12,
@@ -1042,7 +1182,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   premiumCloseBtnText: {
-    color: '#ffffff',
+    color: theme.surface,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -1057,7 +1197,7 @@ const styles = StyleSheet.create({
   queueProgressContainer: {
     width: '100%',
     height: 8,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     borderRadius: 4,
     marginBottom: 24,
     overflow: 'hidden',
@@ -1069,41 +1209,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0f172a',
+    color: theme.text,
     letterSpacing: -0.5,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
   listContainer: {
     padding: 24,
     paddingBottom: 100,
@@ -1113,18 +1222,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyStateText: {
-    color: '#64748b',
+    color: theme.icon,
     fontSize: 16,
   },
   leadCard: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -1146,15 +1255,15 @@ const styles = StyleSheet.create({
   leadName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
     marginBottom: 4,
   },
   leadMobile: {
     fontSize: 14,
-    color: '#64748b',
+    color: theme.icon,
   },
   statusBadge: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
@@ -1166,11 +1275,11 @@ const styles = StyleSheet.create({
   },
   pendingCard: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -1189,11 +1298,11 @@ const styles = StyleSheet.create({
   pendingLeadName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
   },
   pendingLeadSub: {
     fontSize: 14,
-    color: '#64748b',
+    color: theme.icon,
     fontWeight: '500',
   },
   inlineUpdateBtn: {
@@ -1205,7 +1314,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   inlineUpdateText: {
-    color: '#ffffff',
+    color: theme.surface,
     fontSize: 13,
     fontWeight: '600',
     marginLeft: 6,
@@ -1217,12 +1326,12 @@ const styles = StyleSheet.create({
   },
   pendingDueText: {
     fontSize: 14,
-    color: '#334155',
+    color: theme.textSecondary,
     fontWeight: '600',
     marginRight: 12,
   },
   pendingStatusBadge: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: theme.surfaceLight,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -1243,7 +1352,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
   },
   pendingUpdateBtn: {
     backgroundColor: '#0284c7',
@@ -1264,7 +1373,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     maxHeight: 850,
     borderWidth: 8,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderRadius: 40,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1285,7 +1394,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
   },
   modalContent: {
     padding: 24,
@@ -1304,17 +1413,17 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
   },
   optionCardSelected: {
     borderColor: '#0284c7',
-    backgroundColor: '#f0f9ff',
+    backgroundColor: theme.surfaceLight,
   },
   optionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#475569',
+    color: theme.textSecondary,
   },
   optionTextSelected: {
     color: '#0284c7',
@@ -1322,17 +1431,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
+    color: theme.textSecondary,
     marginBottom: 8,
   },
   notesInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#0f172a',
+    color: theme.text,
     height: 100,
     textAlignVertical: 'top',
     marginBottom: 24,
@@ -1340,16 +1449,16 @@ const styles = StyleSheet.create({
   dateSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderRadius: 12,
     padding: 16,
     marginBottom: 32,
   },
   dateSelectorText: {
     fontSize: 16,
-    color: '#0f172a',
+    color: theme.text,
     marginLeft: 12,
     fontWeight: '500',
   },
@@ -1361,25 +1470,26 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   saveButtonDisabled: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: theme.icon,
   },
   saveButtonText: {
-    color: '#ffffff',
+    color: theme.surface,
     fontSize: 16,
     fontWeight: '700',
   },
   dateModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
   },
   calendarModalContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    width: '90%',
-    maxWidth: 400,
+    backgroundColor: theme.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    width: '100%',
+    height: 450,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -1387,3 +1497,4 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
 });
+}

@@ -1,21 +1,31 @@
+import { useAppTheme } from '../../hooks/useAppTheme';
+import { AppText } from '../../components/AppText';
+import { useThemeStore } from '../../store/themeStore';
+import { Colors } from '../../theme/colors';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, Alert, Pressable } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Phone, MessageCircle, Send, Plus, Pencil, Trash, X, Calendar as CalendarIcon, Check, MoreVertical } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLeadStore } from '../../store/leadStore';
 import { callNumber, openWhatsApp } from '../../utils/deepLinks';
-import { Calendar } from 'react-native-calendars';
+import { CalendarList } from 'react-native-calendars';
+import { FollowUpDatePicker } from '../../components/FollowUpDatePicker';
 
 export default function LeadDetailScreen() {
+  const { mode } = useThemeStore();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   
   const handleGoBack = () => {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.push('/(tabs)');
+      router.replace('/(tabs)');
     }
   };
   
@@ -74,6 +84,10 @@ export default function LeadDetailScreen() {
 
     if (newStatus && lead) {
       await updateLeadStatus(lead.id, newStatus);
+    }
+
+    if (lead) {
+      await updateLead(lead.id, { next_follow_up_date: finalNextVisit || undefined });
     }
 
     let finalComment = comment.trim();
@@ -138,7 +152,7 @@ export default function LeadDetailScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>Lead not found.</Text>
+          <AppText style={styles.emptyStateText}>Lead not found.</AppText>
         </View>
       </SafeAreaView>
     );
@@ -187,19 +201,19 @@ export default function LeadDetailScreen() {
       >
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+            <TouchableOpacity onPress={handleGoBack} style={styles.backButton} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
               <ChevronLeft size={24} color="#0f172a" />
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
-              <Text style={styles.headerTitle}>{lead.name}</Text>
-              <Text style={styles.headerSubTitle}>{lead.mobile}</Text>
+              <AppText style={styles.headerTitle}>{lead.name}</AppText>
+              <AppText style={styles.headerSubTitle}>{lead.mobile}</AppText>
             </View>
           </View>
           
           <View style={styles.headerActions}>
             <TouchableOpacity onPress={() => callNumber(lead.mobile)} style={styles.headerActionBtn}>
               <View style={[styles.iconCircle, { backgroundColor: 'rgba(2, 132, 199, 0.1)' }]}>
-                <Phone size={18} color="#0284c7" />
+                <Phone size={18} color={theme.primaryDark} />
               </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => openWhatsApp(lead.mobile)} style={styles.headerActionBtn}>
@@ -208,7 +222,7 @@ export default function LeadDetailScreen() {
               </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowContactMenu(true)} style={[styles.headerActionBtn, { marginLeft: 8 }]}>
-              <View style={[styles.iconCircle, { backgroundColor: '#f1f5f9' }]}>
+              <View style={[styles.iconCircle, { backgroundColor: theme.background }]}>
                 <MoreVertical size={20} color="#475569" />
               </View>
             </TouchableOpacity>
@@ -217,29 +231,29 @@ export default function LeadDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
 
-        <Text style={styles.sectionTitle}>Lead Information</Text>
+        <AppText style={styles.sectionTitle}>Lead Information</AppText>
         <View style={styles.infoCard}>
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Customer Type</Text>
-            <Text style={styles.infoValue}>{lead.customer_type || 'N/A'}</Text>
+            <AppText style={styles.infoLabel}>Customer Type</AppText>
+            <AppText style={styles.infoValue}>{lead.customer_type || 'N/A'}</AppText>
           </View>
           <View style={styles.divider} />
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Address</Text>
-            <Text style={styles.infoValue}>{lead.address || 'N/A'}</Text>
+            <AppText style={styles.infoLabel}>Address</AppText>
+            <AppText style={styles.infoValue}>{lead.address || 'N/A'}</AppText>
           </View>
           {lead.district ? (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>District</Text>
-              <Text style={styles.infoValue}>{lead.district}</Text>
+              <AppText style={styles.infoLabel}>District</AppText>
+              <AppText style={styles.infoValue}>{lead.district}</AppText>
             </View>
           ) : null}
           {lead.state ? (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>State</Text>
-              <Text style={styles.infoValue}>{lead.state}</Text>
+              <AppText style={styles.infoLabel}>State</AppText>
+              <AppText style={styles.infoValue}>{lead.state}</AppText>
             </View>
           ) : null}
           {showAllInfo && (
@@ -247,56 +261,56 @@ export default function LeadDetailScreen() {
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Profile</Text>
-                <Text style={styles.infoValue}>{lead.profile || 'N/A'}</Text>
+                <AppText style={styles.infoLabel}>Profile</AppText>
+                <AppText style={styles.infoValue}>{lead.profile || 'N/A'}</AppText>
               </View>
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Requirement</Text>
-                <Text style={styles.infoValue}>{lead.requirement || 'N/A'}</Text>
+                <AppText style={styles.infoLabel}>Requirement</AppText>
+                <AppText style={styles.infoValue}>{lead.requirement || 'N/A'}</AppText>
               </View>
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Budget</Text>
-                <Text style={styles.infoValue}>{lead.budget || 'N/A'}</Text>
+                <AppText style={styles.infoLabel}>Budget</AppText>
+                <AppText style={styles.infoValue}>{lead.budget || 'N/A'}</AppText>
               </View>
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Property Type</Text>
-                <Text style={styles.infoValue}>{lead.property_type || 'N/A'}</Text>
+                <AppText style={styles.infoLabel}>Property Type</AppText>
+                <AppText style={styles.infoValue}>{lead.property_type || 'N/A'}</AppText>
               </View>
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Size</Text>
-                <Text style={styles.infoValue}>{lead.size ? `${lead.size} sq yd` : 'N/A'}</Text>
+                <AppText style={styles.infoLabel}>Size</AppText>
+                <AppText style={styles.infoValue}>{lead.size ? `${lead.size} sq yd` : 'N/A'}</AppText>
               </View>
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Road Size</Text>
-                <Text style={styles.infoValue}>{lead.road_size || 'N/A'}</Text>
+                <AppText style={styles.infoLabel}>Road Size</AppText>
+                <AppText style={styles.infoValue}>{lead.road_size || 'N/A'}</AppText>
               </View>
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Facing</Text>
-                <Text style={styles.infoValue}>{lead.facing || 'N/A'}</Text>
+                <AppText style={styles.infoLabel}>Facing</AppText>
+                <AppText style={styles.infoValue}>{lead.facing || 'N/A'}</AppText>
               </View>
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Location</Text>
-                <Text style={styles.infoValue}>{lead.location || 'N/A'}</Text>
+                <AppText style={styles.infoLabel}>Location</AppText>
+                <AppText style={styles.infoValue}>{lead.location || 'N/A'}</AppText>
               </View>
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Bank Loan</Text>
-                <Text style={styles.infoValue}>{lead.loan_requirement || 'N/A'}</Text>
+                <AppText style={styles.infoLabel}>Bank Loan</AppText>
+                <AppText style={styles.infoValue}>{lead.loan_requirement || 'N/A'}</AppText>
               </View>
             </>
           )}
@@ -305,16 +319,16 @@ export default function LeadDetailScreen() {
             style={styles.seeMoreButton} 
             onPress={() => setShowAllInfo(!showAllInfo)}
           >
-            <Text style={styles.seeMoreButtonText}>
+            <AppText style={styles.seeMoreButtonText}>
               {showAllInfo ? 'See Less' : 'See More'}
-            </Text>
+            </AppText>
           </TouchableOpacity>
           
         </View>
 
         <View style={styles.sectionHeaderContainer}>
           <MessageCircle size={20} color="#0f172a" style={styles.sectionIcon} />
-          <Text style={styles.sectionTitleWithIcon}>Conversation</Text>
+          <AppText style={styles.sectionTitleWithIcon}>Conversation</AppText>
           <View style={styles.sectionDivider} />
           <TouchableOpacity 
             style={styles.conversationUpdateBtn}
@@ -325,19 +339,19 @@ export default function LeadDetailScreen() {
               setShowAddFollowUpModal(true);
             }}
           >
-            <Pencil size={14} color="#0284c7" />
-            <Text style={styles.conversationUpdateText}>Update</Text>
+            <Pencil size={14} color={theme.primaryDark} />
+            <AppText style={styles.conversationUpdateText}>Update</AppText>
           </TouchableOpacity>
         </View>
 
         <View style={styles.customerHeader}>
-          <Text style={styles.customerHeaderIcon}>👤</Text>
-          <Text style={styles.customerHeaderText}>Customer</Text>
+          <AppText style={styles.customerHeaderIcon}>👤</AppText>
+          <AppText style={styles.customerHeaderText}>Customer</AppText>
         </View>
 
         {leadFollowUps.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No follow-ups recorded yet.</Text>
+            <AppText style={styles.emptyStateText}>No follow-ups recorded yet.</AppText>
           </View>
         ) : (
           <View style={styles.latestFollowUpCard}>
@@ -352,12 +366,12 @@ export default function LeadDetailScreen() {
               return (
                 <>
                   <View style={styles.latestFollowUpSection}>
-                    <Text style={styles.latestFollowUpLabel}>Next Visit</Text>
-                    <Text style={styles.latestFollowUpValue}>{nextVisitStr}</Text>
+                    <AppText style={styles.latestFollowUpLabel}>Next Visit</AppText>
+                    <AppText style={styles.latestFollowUpValue}>{nextVisitStr}</AppText>
                   </View>
                   <View style={styles.latestFollowUpSection}>
-                    <Text style={styles.latestFollowUpLabel}>Last Comment</Text>
-                    <Text style={styles.latestFollowUpComment}>{latestFollowUp.comment}</Text>
+                    <AppText style={styles.latestFollowUpLabel}>Last Comment</AppText>
+                    <AppText style={styles.latestFollowUpComment}>{latestFollowUp.comment}</AppText>
                   </View>
                 </>
               );
@@ -367,7 +381,7 @@ export default function LeadDetailScreen() {
               style={styles.viewHistoryButton} 
               onPress={() => setShowHistoryModal(true)}
             >
-              <Text style={styles.viewHistoryButtonText}>View Full History</Text>
+              <AppText style={styles.viewHistoryButtonText}>View Full History</AppText>
             </TouchableOpacity>
           </View>
         )}
@@ -384,9 +398,9 @@ export default function LeadDetailScreen() {
             <View style={styles.historyModalHeader}>
               <TouchableOpacity onPress={() => setShowHistoryModal(false)} style={styles.historyModalCloseButton}>
                 <ChevronLeft size={24} color="#0f172a" />
-                <Text style={styles.historyModalCloseText}>Back</Text>
+                <AppText style={styles.historyModalCloseText}>Back</AppText>
               </TouchableOpacity>
-              <Text style={styles.historyModalTitle}>Conversation History</Text>
+              <AppText style={styles.historyModalTitle}>Conversation History</AppText>
               <View style={{ width: 60 }} />
             </View>
             
@@ -402,7 +416,7 @@ export default function LeadDetailScreen() {
                 }}
               >
                 <Pencil size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                <Text style={styles.addConversationProfessionalText}>Add New Conversation</Text>
+                <AppText style={styles.addConversationProfessionalText}>Add New Conversation</AppText>
               </TouchableOpacity>
 
               {leadFollowUps.map((follow, index) => {
@@ -421,8 +435,8 @@ export default function LeadDetailScreen() {
                   <View key={follow.id} style={styles.conversationTimelineItem}>
                     <View style={styles.timelineHeaderRow}>
                       <View style={styles.timelineDateRow}>
-                        <Text style={styles.timelineDateIcon}>📅</Text>
-                        <Text style={styles.timelineDateText}>{dateStr}</Text>
+                        <AppText style={styles.timelineDateIcon}>📅</AppText>
+                        <AppText style={styles.timelineDateText}>{dateStr}</AppText>
                       </View>
                       <View style={styles.timelineActionRow}>
                         <TouchableOpacity onPress={() => handleEditFollowUp(follow)} style={styles.timelineActionBtn}>
@@ -433,14 +447,14 @@ export default function LeadDetailScreen() {
                         </TouchableOpacity>
                       </View>
                     </View>
-                    <Text style={styles.timelineComment}>{follow.comment}</Text>
+                    <AppText style={styles.timelineComment}>{follow.comment}</AppText>
                     
                     {nextVisitStr && (
                       <View style={styles.timelineNextVisitRow}>
-                        <Text style={styles.timelineNextVisitIcon}>📅</Text>
+                        <AppText style={styles.timelineNextVisitIcon}>📅</AppText>
                         <View>
-                          <Text style={styles.timelineNextVisitLabel}>Next Visit:</Text>
-                          <Text style={styles.timelineNextVisitValue}>{nextVisitStr}</Text>
+                          <AppText style={styles.timelineNextVisitLabel}>Next Visit:</AppText>
+                          <AppText style={styles.timelineNextVisitValue}>{nextVisitStr}</AppText>
                         </View>
                       </View>
                     )}
@@ -473,12 +487,12 @@ export default function LeadDetailScreen() {
             <View style={styles.contactMenuContainer}>
               <TouchableOpacity style={styles.menuItem} onPress={handleEditContact}>
                 <Pencil size={18} color="#0f172a" style={styles.menuIcon} />
-                <Text style={styles.menuItemText}>Edit Contact</Text>
+                <AppText style={styles.menuItemText}>Edit Contact</AppText>
               </TouchableOpacity>
               <View style={styles.menuDivider} />
               <TouchableOpacity style={styles.menuItem} onPress={handleDeleteContact}>
                 <Trash size={18} color="#ef4444" style={styles.menuIcon} />
-                <Text style={[styles.menuItemText, { color: '#ef4444' }]}>Delete Contact</Text>
+                <AppText style={[styles.menuItemText, { color: '#ef4444' }]}>Delete Contact</AppText>
               </TouchableOpacity>
             </View>
           </View>
@@ -494,11 +508,11 @@ export default function LeadDetailScreen() {
       >
         <View style={Platform.OS === 'web' ? styles.webModalOverlay : { flex: 1 }}>
           <KeyboardAvoidingView 
-            style={[{ flex: 1, backgroundColor: '#ffffff' }, Platform.OS === 'web' && styles.webModalFrame]} 
+            style={[{ flex: 1, backgroundColor: theme.surface }, Platform.OS === 'web' && styles.webModalFrame]} 
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editingFollowUpId ? 'Edit Follow-up Result' : 'Follow-up Result'}</Text>
+              <AppText style={styles.modalTitle}>{editingFollowUpId ? 'Edit Follow-up Result' : 'Follow-up Result'}</AppText>
               <TouchableOpacity onPress={() => setShowAddFollowUpModal(false)}>
                 <X size={24} color="#0f172a" />
               </TouchableOpacity>
@@ -512,13 +526,13 @@ export default function LeadDetailScreen() {
                     style={[styles.optionCard, updateResult === res && styles.optionCardSelected]}
                     onPress={() => setUpdateResult(res)}
                   >
-                    <Text style={[styles.optionText, updateResult === res && styles.optionTextSelected]}>{res}</Text>
-                    {updateResult === res && <Check size={16} color="#0284c7" />}
+                    <AppText style={[styles.optionText, updateResult === res && styles.optionTextSelected]}>{res}</AppText>
+                    {updateResult === res && <Check size={16} color={theme.primaryDark} />}
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.inputLabel}>Notes</Text>
+              <AppText style={styles.inputLabel}>Notes</AppText>
               <TextInput
                 style={styles.notesInput}
                 placeholder="Enter details here..."
@@ -528,10 +542,10 @@ export default function LeadDetailScreen() {
                 onChangeText={setComment}
               />
 
-              <Text style={styles.inputLabel}>Next Follow-up Date</Text>
+              <AppText style={styles.inputLabel}>Next Follow-up Date</AppText>
               <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
                 <CalendarIcon size={20} color="#64748b" />
-                <Text style={styles.dateSelectorText}>{nextVisit || 'Select Date & Time'}</Text>
+                <AppText style={styles.dateSelectorText}>{nextVisit || 'Select Date & Time'}</AppText>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -542,70 +556,31 @@ export default function LeadDetailScreen() {
                 {isSubmitting ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  <AppText style={styles.saveButtonText}>Save</AppText>
                 )}
               </TouchableOpacity>
             </ScrollView>
+            <FollowUpDatePicker
+              visible={showDatePicker}
+              initialDate={nextVisit}
+              onClose={() => setShowDatePicker(false)}
+              onSave={(date, time) => {
+                setNextVisit(date);
+                setShowDatePicker(false);
+              }}
+            />
           </KeyboardAvoidingView>
         </View>
-      </Modal>
-
-      <Modal
-        visible={showDatePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPressOut={() => setShowDatePicker(false)}
-        >
-          <View style={styles.calendarModalContainer}>
-            <TouchableOpacity activeOpacity={1}>
-              <Calendar
-                current={nextVisit || undefined}
-                onDayPress={(day: any) => {
-                  setNextVisit(day.dateString);
-                  setShowDatePicker(false);
-                }}
-                markedDates={
-                  nextVisit ? {
-                    [nextVisit]: { selected: true, selectedColor: '#0284c7' }
-                  } : {}
-                }
-                theme={{
-                  todayTextColor: '#0284c7',
-                  selectedDayBackgroundColor: '#0284c7',
-                  arrowColor: '#0284c7',
-                  textDayFontWeight: '500',
-                  textMonthFontWeight: 'bold',
-                  textDayHeaderFontWeight: '600',
-                  monthTextColor: '#0f172a',
-                }}
-                style={styles.calendarElement}
-              />
-              <View style={styles.calendarModalActions}>
-                <TouchableOpacity 
-                  style={styles.calendarCloseButton} 
-                  onPress={() => setShowDatePicker(false)}
-                >
-                  <Text style={styles.calendarCloseText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
       </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(theme: any) { return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
   },
   keyboardAvoid: {
     flex: 1,
@@ -615,8 +590,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#ffffff',
+    paddingVertical: 10,
+    backgroundColor: theme.surface,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
@@ -639,11 +614,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
   },
   headerSubTitle: {
     fontSize: 13,
-    color: '#64748b',
+    color: theme.icon,
     marginTop: 2,
   },
   headerActions: {
@@ -670,22 +645,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   actionText: {
-    color: '#0f172a',
+    color: theme.text,
     fontSize: 14,
     fontWeight: '600',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
     marginBottom: 16,
   },
   infoCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     marginBottom: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -701,17 +676,17 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 15,
-    color: '#64748b',
+    color: theme.icon,
     fontWeight: '500',
   },
   infoValue: {
     fontSize: 15,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '600',
   },
   divider: {
     height: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     marginVertical: 12,
   },
   seeMoreButton: {
@@ -730,14 +705,14 @@ const styles = StyleSheet.create({
     padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderStyle: 'dashed',
   },
   emptyStateText: {
-    color: '#94a3b8',
+    color: theme.icon,
     fontSize: 14,
   },
   sectionHeaderContainer: {
@@ -752,18 +727,18 @@ const styles = StyleSheet.create({
   sectionTitleWithIcon: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
   },
   sectionDivider: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: theme.border,
     marginLeft: 12,
   },
   conversationUpdateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f9ff',
+    backgroundColor: theme.surfaceLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -787,7 +762,7 @@ const styles = StyleSheet.create({
   customerHeaderText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#334155',
+    color: theme.textSecondary,
   },
   conversationTimelineItem: {
     marginBottom: 16,
@@ -805,7 +780,7 @@ const styles = StyleSheet.create({
   timelineActionBtn: {
     padding: 6,
     marginLeft: 8,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     borderRadius: 6,
   },
   timelineDateRow: {
@@ -819,11 +794,11 @@ const styles = StyleSheet.create({
   timelineDateText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: theme.icon,
   },
   timelineComment: {
     fontSize: 15,
-    color: '#0f172a',
+    color: theme.text,
     lineHeight: 22,
     marginBottom: 16,
     paddingLeft: 4,
@@ -839,38 +814,38 @@ const styles = StyleSheet.create({
   timelineNextVisitLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#64748b',
+    color: theme.icon,
   },
   timelineNextVisitValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0f172a',
+    color: theme.text,
     marginTop: 2,
   },
   timelineSeparator: {
     height: 1,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: theme.border,
     marginTop: 24,
     marginBottom: 8,
   },
   addFollowUpContainer: {
     marginTop: 32,
     padding: 16,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
   },
   addFollowUpTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
     marginBottom: 12,
   },
   inputComment: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: theme.divider,
     borderRadius: 8,
     padding: 12,
     fontSize: 15,
@@ -879,9 +854,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   inputDate: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: theme.divider,
     borderRadius: 8,
     padding: 12,
     fontSize: 15,
@@ -896,10 +871,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   submitButtonDisabled: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: theme.icon,
   },
   submitButtonText: {
-    color: '#ffffff',
+    color: theme.surface,
     fontSize: 15,
     fontWeight: '600',
     marginRight: 8,
@@ -907,15 +882,15 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    padding: 20,
   },
   calendarModalContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    width: '92%',
-    maxWidth: 340,
+    backgroundColor: theme.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    width: '100%',
+    height: 450,
     overflow: 'hidden',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 20 },
@@ -937,20 +912,20 @@ const styles = StyleSheet.create({
   calendarCloseButton: {
     paddingVertical: 10,
     paddingHorizontal: 32,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     borderRadius: 12,
   },
   calendarCloseText: {
-    color: '#334155',
+    color: theme.textSecondary,
     fontWeight: '700',
     fontSize: 15,
   },
   latestFollowUpCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
   },
   latestFollowUpSection: {
     marginBottom: 16,
@@ -958,36 +933,36 @@ const styles = StyleSheet.create({
   latestFollowUpLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: theme.icon,
     marginBottom: 6,
   },
   latestFollowUpValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
   },
   latestFollowUpComment: {
     fontSize: 15,
-    color: '#334155',
+    color: theme.textSecondary,
     lineHeight: 22,
   },
   viewHistoryButton: {
     marginTop: 8,
     paddingVertical: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: theme.divider,
     borderRadius: 8,
     alignItems: 'center',
   },
   viewHistoryButtonText: {
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '600',
     fontSize: 15,
   },
   historyModalContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
   },
   historyModalHeader: {
     flexDirection: 'row',
@@ -997,7 +972,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
   },
   historyModalCloseButton: {
     flexDirection: 'row',
@@ -1005,7 +980,7 @@ const styles = StyleSheet.create({
   },
   dateSelectorText: {
     fontSize: 15,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '500',
     marginLeft: 8,
   },
@@ -1024,7 +999,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Platform.OS === 'ios' ? 100 : 80,
     right: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderRadius: 12,
     paddingVertical: 8,
     width: 200,
@@ -1046,21 +1021,21 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#0f172a',
+    color: theme.text,
   },
   menuDivider: {
     height: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     marginHorizontal: 16,
   },
   historyModalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
   },
   historyModalCloseText: {
     fontSize: 16,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '500',
     marginLeft: 4,
   },
@@ -1069,8 +1044,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: '#eff6ff',
     borderRadius: 8,
+  },
+  timelineBubble: {
+    padding: 12,
+    borderRadius: 12,
   },
   updateButtonText: {
     fontSize: 14,
@@ -1091,7 +1069,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
   },
   modalContent: {
     padding: 24,
@@ -1110,17 +1088,17 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
   },
   optionCardSelected: {
     borderColor: '#0284c7',
-    backgroundColor: '#f0f9ff',
+    backgroundColor: theme.surfaceLight,
   },
   optionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#475569',
+    color: theme.textSecondary,
   },
   optionTextSelected: {
     color: '#0284c7',
@@ -1128,17 +1106,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
+    color: theme.textSecondary,
     marginBottom: 8,
   },
   notesInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#0f172a',
+    color: theme.text,
     height: 100,
     textAlignVertical: 'top',
     marginBottom: 24,
@@ -1146,9 +1124,9 @@ const styles = StyleSheet.create({
   dateSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderRadius: 12,
     padding: 16,
     marginBottom: 32,
@@ -1161,10 +1139,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   saveButtonDisabled: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: theme.icon,
   },
   saveButtonText: {
-    color: '#ffffff',
+    color: theme.surface,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -1187,7 +1165,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   addConversationProfessionalText: {
-    color: '#ffffff',
+    color: theme.surface,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1202,7 +1180,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     maxHeight: 850,
     borderWidth: 8,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderRadius: 40,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1212,3 +1190,4 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   }
 });
+}

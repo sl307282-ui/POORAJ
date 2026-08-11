@@ -1,11 +1,19 @@
+import { useAppTheme } from '../../hooks/useAppTheme';
+import { AppText } from '../../components/AppText';
+import { useThemeStore } from '../../store/themeStore';
+import { Colors } from '../../theme/colors';
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Calendar } from 'react-native-calendars';
 import { User, ChevronRight, Calendar as CalendarIcon } from 'lucide-react-native';
 import { useLeadStore } from '../../store/leadStore';
 
 export default function CalendarScreen() {
+  const { mode } = useThemeStore();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const router = useRouter();
   const { leads, followUps } = useLeadStore();
   
@@ -28,10 +36,10 @@ export default function CalendarScreen() {
           if (!marks[date]) {
             marks[date] = { 
               selected: true, 
-              selectedColor: '#e0f2fe', 
-              selectedTextColor: '#0284c7',
+              selectedColor: theme.surfaceLight, 
+              selectedTextColor: theme.primaryDark,
               marked: true, 
-              dotColor: '#0284c7' 
+              dotColor: theme.primaryDark 
             };
           }
         }
@@ -43,14 +51,14 @@ export default function CalendarScreen() {
       marks[selectedDate] = { 
         ...marks[selectedDate], 
         selected: true, 
-        selectedColor: '#0284c7', 
+        selectedColor: theme.primaryDark, 
         selectedTextColor: '#ffffff',
         disableTouchEvent: true 
       };
     } else {
       marks[selectedDate] = { 
         selected: true, 
-        selectedColor: '#0284c7', 
+        selectedColor: theme.primaryDark, 
         selectedTextColor: '#ffffff',
         disableTouchEvent: true 
       };
@@ -85,38 +93,42 @@ export default function CalendarScreen() {
     
     return (
       <View style={styles.dateHeader}>
-        <Text style={styles.dateTitle}>{isToday ? 'Today' : formattedDate}</Text>
-        <Text style={styles.dateSubtitle}>{selectedDayFollowUps.length} follow-up{selectedDayFollowUps.length !== 1 ? 's' : ''} scheduled</Text>
+        <AppText style={styles.dateTitle}>{isToday ? 'Today' : formattedDate}</AppText>
+        <AppText style={styles.dateSubtitle}>{selectedDayFollowUps.length} follow-up{selectedDayFollowUps.length !== 1 ? 's' : ''} scheduled</AppText>
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Follow-up Calendar</Text>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <View style={styles.headerTextContainer}>
+          <AppText style={[styles.headerTitle, { color: theme.text }]}>Calendar</AppText>
+          <AppText style={[styles.headerSubtitle, { color: theme.textSecondary }]}>Manage your follow-ups and meetings</AppText>
+        </View>
       </View>
       
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.calendarContainer}>
           <Calendar
+            key={mode}
             current={selectedDate}
             onDayPress={(day: any) => setSelectedDate(day.dateString)}
             markedDates={markedDates}
             enableSwipeMonths={true}
             theme={{
-              backgroundColor: '#ffffff',
-              calendarBackground: '#ffffff',
-              textSectionTitleColor: '#64748b',
-              selectedDayBackgroundColor: '#0284c7',
+              backgroundColor: theme.surface,
+              calendarBackground: theme.surface,
+              textSectionTitleColor: theme.icon,
+              selectedDayBackgroundColor: theme.primaryDark,
               selectedDayTextColor: '#ffffff',
-              todayTextColor: '#0284c7',
-              dayTextColor: '#334155',
-              textDisabledColor: '#cbd5e1',
-              dotColor: '#0284c7',
+              todayTextColor: theme.primaryDark,
+              dayTextColor: theme.text,
+              textDisabledColor: mode === 'dark' ? '#334155' : '#cbd5e1',
+              dotColor: theme.primaryDark,
               selectedDotColor: '#ffffff',
-              arrowColor: '#0284c7',
-              monthTextColor: '#0f172a',
+              arrowColor: theme.primaryDark,
+              monthTextColor: theme.text,
               textDayFontWeight: '500',
               textMonthFontWeight: '700',
               textDayHeaderFontWeight: '600',
@@ -133,8 +145,8 @@ export default function CalendarScreen() {
           {selectedDayFollowUps.length === 0 ? (
             <View style={styles.emptyState}>
               <CalendarIcon size={48} color="#cbd5e1" style={styles.emptyIcon} />
-              <Text style={styles.emptyText}>No follow-ups for this date</Text>
-              <Text style={styles.emptySubtext}>Select another date or add follow-ups from the leads page.</Text>
+              <AppText style={styles.emptyText}>No follow-ups for this date</AppText>
+              <AppText style={styles.emptySubtext}>Select another date or add follow-ups from the leads page.</AppText>
             </View>
           ) : (
             selectedDayFollowUps.map((item) => (
@@ -146,20 +158,20 @@ export default function CalendarScreen() {
               >
                 <View style={styles.cardHeader}>
                   <View style={styles.avatar}>
-                    <User size={20} color="#0284c7" />
+                    <User size={20} color={theme.primaryDark} />
                   </View>
                   <View style={styles.leadInfo}>
-                    <Text style={styles.leadName}>{item.lead.name}</Text>
-                    <Text style={styles.leadMobile}>{item.lead.mobile}</Text>
+                    <AppText style={styles.leadName}>{item.lead.name}</AppText>
+                    <AppText style={styles.leadMobile}>{item.lead.mobile}</AppText>
                   </View>
                   <ChevronRight size={20} color="#94a3b8" />
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.cardContent}>
-                  <Text style={styles.commentLabel}>Context:</Text>
-                  <Text style={styles.commentText} numberOfLines={2}>
+                  <AppText style={styles.commentLabel}>Context:</AppText>
+                  <AppText style={styles.commentText} numberOfLines={2}>
                     {item.followUp.comment || 'No notes provided'}
-                  </Text>
+                  </AppText>
                 </View>
               </TouchableOpacity>
             ))
@@ -170,26 +182,38 @@ export default function CalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(theme: any) { return StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.surfaceLight,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  headerTextContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+    paddingLeft: 8
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
   },
   scrollContent: {
     paddingBottom: 100,
   },
   calendarContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     margin: 16,
     borderRadius: 20,
     padding: 8,
@@ -207,24 +231,24 @@ const styles = StyleSheet.create({
   dateTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
     marginBottom: 4,
   },
   dateSubtitle: {
     fontSize: 14,
-    color: '#64748b',
+    color: theme.icon,
     fontWeight: '500',
   },
   listContainer: {
     paddingHorizontal: 16,
   },
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
@@ -239,7 +263,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: theme.surfaceLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -250,16 +274,16 @@ const styles = StyleSheet.create({
   leadName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: theme.text,
     marginBottom: 2,
   },
   leadMobile: {
     fontSize: 14,
-    color: '#64748b',
+    color: theme.icon,
   },
   divider: {
     height: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.background,
     marginVertical: 12,
   },
   cardContent: {
@@ -268,12 +292,12 @@ const styles = StyleSheet.create({
   commentLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: theme.icon,
     marginBottom: 4,
   },
   commentText: {
     fontSize: 14,
-    color: '#334155',
+    color: theme.textSecondary,
     lineHeight: 20,
   },
   emptyState: {
@@ -281,10 +305,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 40,
     paddingHorizontal: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: theme.border,
     borderStyle: 'dashed',
   },
   emptyIcon: {
@@ -293,13 +317,14 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#475569',
+    color: theme.textSecondary,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: theme.icon,
     textAlign: 'center',
     lineHeight: 20,
   }
 });
+}

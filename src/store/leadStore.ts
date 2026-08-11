@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Lead, FollowUp, Deal, LeadStatus } from '../models/types';
 import { supabase } from '../services/supabase';
 import { dummyLeads, dummyFollowUps, dummyDeals } from '../utils/dummyData';
+import { useSyncStore } from './syncStore';
 
 interface LeadStoreState {
   leads: Lead[];
@@ -14,7 +15,7 @@ interface LeadStoreState {
   
   // Actions
   fetchLeads: () => Promise<void>;
-  addLead: (lead: Omit<Lead, 'id' | 'created_at'>) => Promise<void>;
+  addLead: (lead: Omit<Lead, 'id' | 'created_at'>) => Promise<Lead | undefined>;
   updateLeadStatus: (id: string, status: LeadStatus) => Promise<void>;
   updateLead: (id: string, updates: Partial<Lead>) => Promise<void>;
   deleteLead: (id: string) => Promise<void>;
@@ -33,9 +34,9 @@ interface LeadStoreState {
 export const useLeadStore = create<LeadStoreState>()(
   persist(
     (set, get) => ({
-      leads: dummyLeads,
-      followUps: dummyFollowUps,
-      deals: dummyDeals,
+      leads: [],
+      followUps: [],
+      deals: [],
       loading: false,
       error: null,
       
@@ -51,7 +52,7 @@ export const useLeadStore = create<LeadStoreState>()(
 
         set({ loading: true, error: null });
         try {
-          set({ leads: dummyLeads, followUps: dummyFollowUps, deals: dummyDeals, loading: false });
+          set({ loading: false });
         } catch (error: any) {
           set({ error: error.message, loading: false });
         }
@@ -67,8 +68,11 @@ export const useLeadStore = create<LeadStoreState>()(
             status: lead.status || 'Fresh',
           } as Lead;
           set((state) => ({ leads: [newLead, ...state.leads], loading: false }));
+          useSyncStore.getState().enqueueOperation();
+          return newLead;
         } catch (error: any) {
           set({ error: error.message, loading: false });
+          return undefined;
         }
       },
 
@@ -78,6 +82,7 @@ export const useLeadStore = create<LeadStoreState>()(
           set((state) => ({
             leads: state.leads.map((l) => (l.id === id ? { ...l, status } : l))
           }));
+          useSyncStore.getState().enqueueOperation();
         } catch (error: any) {
           set({ error: error.message });
         }
@@ -88,6 +93,7 @@ export const useLeadStore = create<LeadStoreState>()(
           set((state) => ({
             leads: state.leads.map((l) => (l.id === id ? { ...l, ...updates } : l))
           }));
+          useSyncStore.getState().enqueueOperation();
         } catch (error: any) {
           set({ error: error.message });
         }
@@ -100,6 +106,7 @@ export const useLeadStore = create<LeadStoreState>()(
             followUps: state.followUps.filter((f) => f.lead_id !== id),
             deals: state.deals.filter((d) => d.lead_id !== id),
           }));
+          useSyncStore.getState().enqueueOperation();
         } catch (error: any) {
           set({ error: error.message });
         }
@@ -114,6 +121,7 @@ export const useLeadStore = create<LeadStoreState>()(
             created_at: new Date().toISOString(),
           } as FollowUp;
           set((state) => ({ followUps: [newFollowUp, ...state.followUps] }));
+          useSyncStore.getState().enqueueOperation();
         } catch (error: any) {
           set({ error: error.message });
         }
@@ -124,6 +132,7 @@ export const useLeadStore = create<LeadStoreState>()(
           set((state) => ({
             followUps: state.followUps.map(f => (f.id === id ? { ...f, ...updates } : f))
           }));
+          useSyncStore.getState().enqueueOperation();
         } catch (error: any) {
           set({ error: error.message });
         }
@@ -134,6 +143,7 @@ export const useLeadStore = create<LeadStoreState>()(
           set((state) => ({
             followUps: state.followUps.filter(f => f.id !== id)
           }));
+          useSyncStore.getState().enqueueOperation();
         } catch (error: any) {
           set({ error: error.message });
         }
@@ -148,6 +158,7 @@ export const useLeadStore = create<LeadStoreState>()(
             created_at: new Date().toISOString(),
           } as Deal;
           set((state) => ({ deals: [newDeal, ...state.deals] }));
+          useSyncStore.getState().enqueueOperation();
         } catch (error: any) {
           set({ error: error.message });
         }

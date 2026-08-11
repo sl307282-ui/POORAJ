@@ -4,18 +4,21 @@
     "slug": "POORAJ",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/pooraj-icon.png",
     "scheme": "pooraj",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.pooraj.crm"
+      "icon": "./assets/images/pooraj-icon.png",
+      "bundleIdentifier": "com.pooraj.crm",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["whatsapp", "tel", "telprompt"]
+      }
     },
     "android": {
       "package": "com.pooraj.crm",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/pooraj-icon.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -30,16 +33,19 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/pooraj-splash-final-v2.jpg",
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#FFFFFF",
+            "image": "./assets/images/pooraj-splash-final-v2.jpg"
+          }
         }
       ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     }
   }
 }

@@ -7,19 +7,18 @@ export const callNumber = (phone: string) => {
   } else {
     phoneNumber = `tel:${phone}`;
   }
-  Linking.canOpenURL(phoneNumber)
-    .then(supported => {
-      if (!supported) {
-        console.log('Phone number is not available');
-      } else {
-        return Linking.openURL(phoneNumber);
-      }
-    })
-    .catch(err => console.log(err));
+  Linking.openURL(phoneNumber).catch(err => console.log('Error opening dialer:', err));
 };
 
 export const openWhatsApp = (phone: string, text: string = '') => {
-  const cleanPhone = phone.replace(/\D/g, '');
+  if (!phone || typeof phone !== 'string') {
+    console.log('Error: Phone number is invalid or missing');
+    return;
+  }
+  let cleanPhone = phone.replace(/\D/g, '');
+  if (cleanPhone.length === 10) {
+    cleanPhone = '91' + cleanPhone;
+  }
   const urlParams = `?text=${encodeURIComponent(text)}`;
 
   if (Platform.OS === 'web') {
@@ -37,5 +36,8 @@ export const openWhatsApp = (phone: string, text: string = '') => {
         return Linking.openURL(url);
       }
     })
-    .catch(err => console.log(err));
+    .catch(err => {
+      console.log('WhatsApp scheme not allowed (likely Expo Go). Using fallback:', err.message || err);
+      Linking.openURL(`https://wa.me/${cleanPhone}${urlParams}`);
+    });
 };

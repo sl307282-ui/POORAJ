@@ -1,12 +1,17 @@
+import { useAppTheme } from '../../hooks/useAppTheme';
+import { AppText } from '../../components/AppText';
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Animated, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Platform } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Users, CalendarClock, UserPlus, CheckCircle, TrendingUp, Clock, ChevronRight, Menu, Bell } from 'lucide-react-native';
 import { useLeadStore } from '../../store/leadStore';
 import { MetricCard } from '../../components/MetricCard';
 import { useRouter, useNavigation } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeStore } from '../../store/themeStore';
+import { useSyncStore } from '../../store/syncStore';
 import { Colors } from '../../theme/colors';
+import { Cloud, CloudOff, RefreshCw, CheckCircle2 } from 'lucide-react-native';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -14,10 +19,12 @@ export default function Dashboard() {
   const scrollY = React.useRef(new Animated.Value(0)).current;
   const { leads, followUps, deals, fetchLeads } = useLeadStore();
   const { mode } = useThemeStore();
-  const theme = Colors[mode === 'dark' ? 'dark' : 'light'];
+  const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const { syncStatus, pendingOperations } = useSyncStore();
 
   useEffect(() => {
-    fetchLeads(); // Fetch from store (currently dummy data)
+    fetchLeads(); // Fetch from store
   }, []);
 
   const today = new Date().toISOString().split('T')[0];
@@ -25,11 +32,12 @@ export default function Dashboard() {
   
   const latestFollowUps = leads.map(lead => followUps.find(f => f.lead_id === lead.id)).filter(Boolean);
   
-  const todayFollowUps = latestFollowUps.filter(f => f.next_follow_up_date === today).length || 0;
-  const upcomingFollowUps = latestFollowUps.filter(f => f.next_follow_up_date && f.next_follow_up_date > today).length || 0;
-  const pendingFollowUps = latestFollowUps.filter(f => f.next_follow_up_date && f.next_follow_up_date < today).length || 0;
+  const dueTodayCount = latestFollowUps.filter(f => f.next_follow_up_date === today).length || 0;
+  const completedTodayCount = followUps.filter(f => f.created_at?.startsWith(today) || f.visit_date === today).length || 0;
   
-  const freshCustomers = leads.filter(l => l.status === 'Fresh').length || 0;
+  const upcomingFollowUps = latestFollowUps.filter(f => f.next_follow_up_date && f.next_follow_up_date > today).length || 0;
+  
+  const freshCustomers = leads.filter(l => l.customer_type === 'Fresh Lead' || l.customer_type === 'Fresh' || (l.customer_type as any) === 'Fresh ').length || 0;
   const closedDeals = deals.filter(d => d.deal_status === 'Won').length || 0;
 
   const headerBackgroundOpacity = scrollY.interpolate({
@@ -40,33 +48,26 @@ export default function Dashboard() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <Animated.View style={[styles.stickyHeader, { borderBottomColor: mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.surface, opacity: headerBackgroundOpacity }]} />
-        <View style={styles.headerTopRow}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity 
-              style={styles.menuButton} 
-              onPress={() => (navigation as any).openDrawer()}
-            >
-              <Menu size={24} color={theme.text} />
-            </TouchableOpacity>
-            <Text style={[styles.brandTitle, { color: theme.text }]}>Pooroj</Text>
-          </View>
-          
-          <TouchableOpacity style={styles.notificationButton}>
-            <Bell size={22} color={theme.text} />
-            <View style={[styles.notificationBadge, { borderColor: theme.background }]} />
-          </TouchableOpacity>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <TouchableOpacity 
+          style={styles.menuButton} 
+          onPress={() => (navigation as any).openDrawer()}
+        >
+          <Menu size={24} color={theme.text} />
+        </TouchableOpacity>
+        
+        <View style={styles.headerTextContainer}>
+          <AppText style={[styles.headerTitle, { color: theme.text }]}>POORAJ</AppText>
         </View>
-      </Animated.View>
+        
+      </View>
 
       <ScrollView 
         contentContainerStyle={styles.scrollContent} 
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: Platform.OS !== 'web' }
-        )}
+        onScroll={(e) => {
+          scrollY.setValue(e.nativeEvent.contentOffset.y);
+        }}
         scrollEventThrottle={16}
       >
         <LinearGradient
@@ -75,29 +76,45 @@ export default function Dashboard() {
         />
 
         <View style={styles.metricsGrid}>
-          <MetricCard title="Today's Follow-ups" value={todayFollowUps} icon={CalendarClock} color="#d97706" onPress={() => router.push('/search?filter=today')} />
-          <MetricCard title="Pending Follow-ups" value={pendingFollowUps} icon={Clock} color="#dc2626" onPress={() => router.push('/search?filter=pending')} />
-          <MetricCard title="Upcoming Follow-ups" value={upcomingFollowUps} icon={CalendarClock} color="#0ea5e9" onPress={() => router.push('/search?filter=upcoming')} />
+          <AppText style={[styles.sectionTitle, { color: theme.text, width: '100%', marginBottom: 12, marginTop: 0 }]}>Today's Tasks</AppText>
+          <MetricCard title="Follow-ups Due Today" value={dueTodayCount} icon={CalendarClock} color="#d97706" onPress={() => router.push('/search?filter=today')} />
+          <MetricCard title="Follow-ups Completed Today" value={completedTodayCount} icon={CheckCircle} color="#10b981" onPress={() => router.push('/search?filter=completed')} />
+          
+          <AppText style={[styles.sectionTitle, { color: theme.text, width: '100%', marginBottom: 12, marginTop: 8 }]}>Overview</AppText>
+          <MetricCard title="Upcoming Follow-ups" value={upcomingFollowUps} icon={CalendarClock} color={theme.primary} onPress={() => router.push('/search?filter=upcoming')} />
           <MetricCard title="Fresh Customers" value={freshCustomers} icon={UserPlus} color="#059669" onPress={() => router.push('/search?filter=fresh')} />
           <MetricCard title="Closed Deals" value={closedDeals} icon={CheckCircle} color="#7c3aed" onPress={() => router.push('/search?filter=closed')} />
-          <MetricCard title="Total Leads" value={totalLeads} icon={Users} color="#0284c7" onPress={() => router.push('/search?filter=total')} />
+          <MetricCard title="Total Leads" value={totalLeads} icon={Users} color={theme.primaryDark} onPress={() => router.push('/search?filter=total')} />
         </View>
 
         <View style={styles.recentSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Leads</Text>
-          {leads.slice(0, 3).map((lead) => (
-            <TouchableOpacity 
-              key={lead.id} 
-              style={[styles.leadCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-              onPress={() => router.push(`/lead/${lead.id}`)}
-            >
-              <View style={styles.leadInfo}>
-                <Text style={[styles.leadName, { color: theme.text }]}>{lead.name}</Text>
-                <Text style={[styles.leadStatus, { color: theme.textSecondary }]}>{lead.status}</Text>
-              </View>
-              <ChevronRight size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
-          ))}
+          <AppText style={[styles.sectionTitle, { color: theme.text, marginBottom: 12 }]}>Recent Leads</AppText>
+          {leads.length > 0 ? (
+            leads.slice(0, 3).map((lead) => (
+              <TouchableOpacity 
+                key={lead.id} 
+                style={[styles.leadCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => router.push(`/lead/${lead.id}`)}
+              >
+                <View style={styles.leadInfo}>
+                  <AppText style={[styles.leadName, { color: theme.text }]}>{lead.name}</AppText>
+                  <AppText style={[styles.leadStatus, { color: theme.textSecondary }]}>{lead.status}</AppText>
+                </View>
+                <ChevronRight size={20} color={theme.textSecondary} />
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={{ padding: 24, alignItems: 'center', backgroundColor: theme.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.border, marginTop: 4 }}>
+              <Users size={32} color={theme.icon} style={{ marginBottom: 12 }} />
+              <AppText style={{ fontSize: 16, color: theme.textSecondary, fontWeight: '500', marginBottom: 16 }}>No recent leads yet</AppText>
+              <TouchableOpacity 
+                style={{ backgroundColor: theme.primaryDark, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 }}
+                onPress={() => router.push('/lead/new')}
+              >
+                <AppText style={{ color: '#fff', fontWeight: '600' }}>Add Lead</AppText>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -107,7 +124,7 @@ export default function Dashboard() {
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={['#0ea5e9', '#0284c7']}
+          colors={[theme.primary, theme.primaryDark]}
           style={styles.fabGradient}
         >
           <UserPlus size={24} color="#ffffff" />
@@ -120,7 +137,6 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
   },
   headerGradient: {
     position: 'absolute',
@@ -132,36 +148,43 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
-    paddingTop: 80,
+    paddingTop: 24,
     paddingBottom: 120,
   },
-  stickyHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-  },
-  headerTopRow: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
   },
-  headerLeft: {
+  headerTextContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+    paddingLeft: 8
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+  },
+  syncBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   menuButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  brandTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginLeft: 4,
+    padding: 4,
   },
   notificationButton: {
     padding: 8,
@@ -184,16 +207,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   recentSection: {
-    marginTop: 24,
+    marginTop: 8,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0f172a', // Slate 900
     marginBottom: 16,
   },
   leadCard: {
-    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -201,7 +222,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#e2e8f0', // Slate 200
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -214,7 +234,6 @@ const styles = StyleSheet.create({
   leadName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a', // Slate 900
     marginBottom: 4,
   },
   leadStatus: {

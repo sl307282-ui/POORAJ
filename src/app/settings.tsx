@@ -1,5 +1,5 @@
-import { useAppTheme } from '../../hooks/useAppTheme';
-import { AppText } from '../../components/AppText';
+import { useAppTheme } from '../hooks/useAppTheme';
+import { AppText } from '../components/AppText';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Switch, Modal, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,12 +9,12 @@ import {
   LayoutDashboard, Shield, Lock, Activity, LogOut, ChevronRight
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { useSettingsStore } from '../../store/settingsStore';
-import { useThemeStore } from '../../store/themeStore';
-import { useLeadStore } from '../../store/leadStore';
-import { Colors } from '../../theme/colors';
+import { useSettingsStore } from '../store/settingsStore';
+import { useThemeStore } from '../store/themeStore';
+import { useLeadStore } from '../store/leadStore';
+import { Colors } from '../theme/colors';
 
-export default function ProfileScreen() {
+export default function SettingsScreen() {
   const router = useRouter();
   const { mode, toggleTheme } = useThemeStore();
   const theme = useAppTheme();
@@ -66,10 +66,14 @@ export default function ProfileScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ChevronLeft size={24} color={theme.text} />
+        </TouchableOpacity>
         <View style={styles.headerTextContainer}>
           <AppText style={[styles.headerTitle, { color: theme.text }]}>Profile & Settings</AppText>
           <AppText style={[styles.headerSubtitle, { color: theme.textSecondary }]}>Manage your profile, preferences and account</AppText>
         </View>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -406,13 +410,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
+  backButton: {
+    padding: 8,
+    marginLeft: -8,
+  },
   headerTextContainer: {
     flex: 1,
-    alignItems: 'flex-start',
-    paddingLeft: 8
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
   },
   headerSubtitle: {

@@ -1,19 +1,25 @@
+import { useAppTheme } from '../../hooks/useAppTheme';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { StyleSheet, View, Platform } from 'react-native';
-import { Home, Search, Calendar, User } from 'lucide-react-native';
+import { Home, Search, Calendar, User, Settings } from 'lucide-react-native';
 import { useThemeStore } from '../../store/themeStore';
 import { Colors } from '../../theme/colors';
 
 export default function TabsLayout() {
   const { mode } = useThemeStore();
-  const theme = Colors[mode === 'dark' ? 'dark' : 'light'];
+  const theme = useAppTheme();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        animation: 'shift',
+        transitionSpec: {
+          animation: 'timing',
+          config: { duration: 100 }
+        },
         tabBarStyle: [styles.tabBar, { 
-          borderTopColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+          borderTopColor: theme.border,
           backgroundColor: mode === 'dark' ? 'rgba(15, 23, 42, 0.75)' : 'rgba(255, 255, 255, 0.75)'
         }],
         tabBarBackground: () => (
@@ -64,10 +70,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: 'Profile & Settings',
           tabBarIcon: ({ color, focused }) => (
             <View style={focused ? styles.iconActive : styles.iconInactive}>
-              <User color={color} size={24} />
+              <Settings color={color} size={24} />
             </View>
           ),
         }}
@@ -81,7 +87,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderTopColor: 'transparent',
     elevation: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)', // White with opacity
     height: 80,
     paddingTop: 10,
   },

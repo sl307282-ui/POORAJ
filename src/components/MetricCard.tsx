@@ -1,7 +1,10 @@
+import { useAppTheme } from '../hooks/useAppTheme';
+import { AppText } from '../components/AppText';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LucideIcon } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useThemeStore } from '../store/themeStore';
+import { Colors } from '../theme/colors';
 
 interface MetricCardProps {
   title: string;
@@ -12,46 +15,43 @@ interface MetricCardProps {
 }
 
 export const MetricCard = ({ title, value, icon: Icon, color, onPress }: MetricCardProps) => {
+  const { mode } = useThemeStore();
+  const theme = useAppTheme();
+
   return (
     <TouchableOpacity 
-      style={styles.cardContainer} 
+      style={[
+        styles.card, 
+        { borderTopColor: color, backgroundColor: theme.surface, borderColor: theme.border }
+      ]} 
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
       disabled={!onPress}
     >
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 1)', 'rgba(248, 250, 252, 1)']}
-        style={[styles.card, { borderTopColor: color }]}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.title} numberOfLines={2}>{title}</Text>
-          <View style={[styles.iconContainer, { backgroundColor: `${color}15` }]}>
-            <Icon size={16} color={color} />
-          </View>
+      <View style={styles.cardHeader}>
+        <AppText style={[styles.title, { color: theme.textSecondary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>{title}</AppText>
+        <View style={[styles.iconContainer, { backgroundColor: `${color}15` }]}>
+          <Icon size={16} color={color} />
         </View>
-        <Text style={styles.value}>{value}</Text>
-      </LinearGradient>
+      </View>
+      <AppText style={[styles.value, { color: theme.text }]} numberOfLines={1} adjustsFontSizeToFit>{value}</AppText>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  cardContainer: {
-    width: '48%',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    marginBottom: 16,
-  },
   card: {
+    width: '48%',
     borderRadius: 16,
     padding: 16,
     borderTopWidth: 4,
     borderWidth: 1,
-    borderColor: '#e2e8f0', // Slate 200
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    marginBottom: 16,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -61,16 +61,14 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: 13,
-    color: '#64748b', // Slate 500
+    fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.5,
-    paddingRight: 8,
-    lineHeight: 18,
+    letterSpacing: 0.2,
+    paddingRight: 4,
+    lineHeight: 16,
   },
   value: {
     fontSize: 24,
-    color: '#0f172a', // Slate 900
     fontWeight: '800',
     letterSpacing: -0.5,
   },

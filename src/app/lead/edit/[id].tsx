@@ -1,5 +1,8 @@
+import { useAppTheme } from '../../../hooks/useAppTheme';
+import { AppText } from '../../../components/AppText';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Save, ChevronDown, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +26,7 @@ const INDIA_STATES = [
 ];
 
 export default function EditLeadScreen() {
+  const theme = useAppTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { leads, updateLead } = useLeadStore();
@@ -102,14 +106,14 @@ export default function EditLeadScreen() {
     return (
       <View style={[styles.fieldContainer, isLast && { borderBottomWidth: 0 }, isExpanded && { zIndex: 1000 }]}>
         <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>{label}</Text>
+          <AppText style={styles.fieldLabel}>{label}</AppText>
           <View style={styles.inputBoxContainer}>
             <TouchableOpacity 
               style={styles.dropdownTriggerBox} 
               onPress={() => setExpandedDropdown(isExpanded ? null : label)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.dropdownTriggerText, isPlaceholder && styles.dropdownPlaceholder]} numberOfLines={1}>{displayValue}</Text>
+              <AppText style={[styles.dropdownTriggerText, isPlaceholder && styles.dropdownPlaceholder]} numberOfLines={1}>{displayValue}</AppText>
               <ChevronDown size={18} color="#94a3b8" style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }} />
             </TouchableOpacity>
           </View>
@@ -128,10 +132,10 @@ export default function EditLeadScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.dropdownFloatingOptionText, selected === opt && styles.dropdownFloatingOptionTextSelected]}>
+                  <AppText style={[styles.dropdownFloatingOptionText, selected === opt && styles.dropdownFloatingOptionTextSelected]}>
                     {opt}
-                  </Text>
-                  {selected === opt && <Check size={16} color="#0284c7" />}
+                  </AppText>
+                  {selected === opt && <Check size={16} color={theme.primaryDark} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -149,7 +153,7 @@ export default function EditLeadScreen() {
     return (
       <View style={[styles.fieldContainer, isLast && { borderBottomWidth: 0 }, isExpanded && { zIndex: 1000 }]}>
         <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>{label}</Text>
+          <AppText style={styles.fieldLabel}>{label}</AppText>
           <View style={styles.inputBoxContainer}>
             <View style={[styles.dropdownTriggerBox, { paddingVertical: 0 }]}>
               <TextInput
@@ -183,10 +187,10 @@ export default function EditLeadScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.dropdownFloatingOptionText, selected === opt && styles.dropdownFloatingOptionTextSelected]}>
+                  <AppText style={[styles.dropdownFloatingOptionText, selected === opt && styles.dropdownFloatingOptionTextSelected]}>
                     {opt}
-                  </Text>
-                  {selected === opt && <Check size={16} color="#0284c7" />}
+                  </AppText>
+                  {selected === opt && <Check size={16} color={theme.primaryDark} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -200,7 +204,7 @@ export default function EditLeadScreen() {
     return (
       <View style={[styles.fieldContainer, isLast && { borderBottomWidth: 0 }]}>
         <View style={[styles.fieldRow, multiline && { minHeight: 80, alignItems: 'flex-start', paddingTop: 12 }]}>
-          <Text style={[styles.fieldLabel, multiline && { marginTop: 10 }]}>{label}</Text>
+          <AppText style={[styles.fieldLabel, multiline && { marginTop: 10 }]}>{label}</AppText>
           <View style={[styles.inputBoxContainer, multiline && { paddingVertical: 0 }]}>
             <TextInput 
               style={[styles.boxInput, multiline && { minHeight: 64, textAlignVertical: 'top' }]} 
@@ -222,10 +226,10 @@ export default function EditLeadScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <ChevronLeft size={24} color="#0f172a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Lead</Text>
+        <AppText style={styles.headerTitle}>Edit Lead</AppText>
         <View style={{ width: 40 }} /> 
       </View>
 
@@ -244,7 +248,7 @@ export default function EditLeadScreen() {
             {renderSearchableDropdown('State', INDIA_STATES, state, setState, true)}
           </View>
 
-          <Text style={styles.sectionTitle}>Lead Preferences</Text>
+          <AppText style={styles.sectionTitle}>Lead Preferences</AppText>
           <View style={[styles.formSection, (expandedDropdown === 'Profile' || expandedDropdown === 'Requirement' || expandedDropdown === 'Property Type' || expandedDropdown === 'Size (sq yd)') && { zIndex: 1000 }]}>
             {renderDropdown('Profile', PROFILES, profile, setProfile)}
             {renderDropdown('Requirement', REQUIREMENTS, requirement, setRequirement)}
@@ -257,7 +261,7 @@ export default function EditLeadScreen() {
             )}
           </View>
 
-          <Text style={styles.sectionTitle}>Property Details</Text>
+          <AppText style={styles.sectionTitle}>Property Details</AppText>
           <View style={[styles.formSection, (expandedDropdown === 'Road Size' || expandedDropdown === 'Facing' || expandedDropdown === 'Bank Loan') && { zIndex: 1000 }]}>
             {renderDropdown('Road Size', ROADS, road, setRoad)}
             {renderDropdown('Facing', FACINGS, facing, setFacing)}
@@ -267,13 +271,13 @@ export default function EditLeadScreen() {
 
           <TouchableOpacity style={styles.saveButtonContainer} onPress={handleSave} activeOpacity={0.8}>
             <LinearGradient
-              colors={['#0ea5e9', '#0284c7']}
+              colors={[theme.primary, theme.primaryDark]}
               style={styles.saveButton}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
               <Save size={20} color="#ffffff" style={{ marginRight: 8 }} />
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <AppText style={styles.saveButtonText}>Save Changes</AppText>
             </LinearGradient>
           </TouchableOpacity>
         </ScrollView>
