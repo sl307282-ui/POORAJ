@@ -8,8 +8,45 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Save, ChevronDown, Check, Calendar as CalendarIcon } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming, interpolateColor } from 'react-native-reanimated';
 import { useLeadStore } from '../../store/leadStore';
 import { FollowUpDatePicker } from '../../components/FollowUpDatePicker';
+
+const FieldHighlight = ({ isActive, isExpanded, children, isLast, theme }: any) => {
+  const progress = useSharedValue(0);
+  
+  React.useEffect(() => {
+    if (isActive) {
+      progress.value = withSequence(
+        withTiming(1, { duration: 250 }),
+        withTiming(0.2, { duration: 250 }),
+        withTiming(1, { duration: 250 })
+      );
+    } else {
+      progress.value = withTiming(0, { duration: 200 });
+    }
+  }, [isActive]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      backgroundColor: interpolateColor(
+        progress.value,
+        [0, 1],
+        ['transparent', 'rgba(2, 132, 199, 0.12)']
+      )
+    };
+  });
+
+  return (
+    <Animated.View style={[{ 
+      borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth, 
+      borderBottomColor: '#e2e8f0',
+      zIndex: isExpanded ? 1000 : 1
+    }, animatedStyle]}>
+      {children}
+    </Animated.View>
+  );
+};
 
 const CUSTOMER_TYPES = ['Fresh Lead', 'Visited Customer', 'Existing Customer'];
 const PROFILES = ['Govt Job', 'Private Job', 'Business', 'Other'];
@@ -61,6 +98,65 @@ export default function NewLeadScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [expandedDropdown, setExpandedDropdown] = useState<string | null>(null);
+  
+  const [activeField, setActiveField] = useState<string>('');
+  const inputRefs = React.useRef<{ [key: string]: TextInput | null }>({});
+
+  React.useEffect(() => {
+    // Start with the first data-entry field at the top
+    const timer = setTimeout(() => {
+      setExpandedDropdown('Customer Type');
+      setActiveField('Customer Type');
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleNext = (currentField: string, selectedValue?: string) => {
+    let nextField = '';
+    switch (currentField) {
+      case 'Customer Type': nextField = 'Customer Name *'; break;
+      case 'Customer Name *': nextField = 'Mobile Number *'; break;
+      case 'Mobile Number *': nextField = 'Address'; break;
+      case 'Address': nextField = 'District'; break;
+      case 'District': nextField = 'State'; break;
+      case 'State': nextField = 'Profile'; break;
+      case 'Profile': 
+        nextField = (selectedValue === 'Other') ? 'Specify Profile' : 'Requirement'; 
+        break;
+      case 'Specify Profile': nextField = 'Requirement'; break;
+      case 'Requirement': nextField = 'Budget'; break;
+      case 'Budget': nextField = 'Property Type'; break;
+      case 'Property Type': nextField = 'Size (sq yd)'; break;
+      case 'Size (sq yd)': 
+        nextField = (selectedValue === 'Custom') ? 'Custom Size' : 'Road Size'; 
+        break;
+      case 'Custom Size': nextField = 'Road Size'; break;
+      case 'Road Size': nextField = 'Facing'; break;
+      case 'Facing': nextField = 'Location'; break;
+      case 'Location': nextField = 'Bank Loan'; break;
+      case 'Bank Loan': nextField = 'Notes / Comments'; break;
+      case 'Notes / Comments': nextField = 'Next Follow-up'; break;
+    }
+
+    if (nextField) {
+      setActiveField(nextField);
+      
+      if (['Customer Type', 'State', 'Profile', 'Requirement', 'Property Type', 'Size (sq yd)', 'Road Size', 'Facing', 'Bank Loan'].includes(nextField)) {
+        setTimeout(() => setExpandedDropdown(nextField), 350); 
+      } else if (nextField === 'Next Follow-up') {
+        setTimeout(() => setShowDatePicker(true), 350);
+      } else {
+        setTimeout(() => {
+          if (inputRefs.current[nextField]) {
+            inputRefs.current[nextField]?.focus();
+          }
+        }, 350);
+      }
+    } else {
+      setActiveField('');
+      setExpandedDropdown(null);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim() || !mobile.trim()) {
@@ -135,15 +231,19 @@ export default function NewLeadScreen() {
     const isExpanded = expandedDropdown === label;
     const displayValue = selected || 'Select option';
     const isPlaceholder = !selected;
+    const isActive = activeField === label;
     
     return (
-      <View style={[styles.fieldContainer, isLast && { borderBottomWidth: 0 }, isExpanded && { zIndex: 1000 }]}>
+      <FieldHighlight isActive={isActive} isExpanded={isExpanded} isLast={isLast} theme={theme}>
         <View style={styles.fieldRow}>
           <AppText style={styles.fieldLabel}>{label}</AppText>
           <View style={styles.inputBoxContainer}>
             <TouchableOpacity 
-              style={styles.dropdownTriggerBox} 
-              onPress={() => setExpandedDropdown(isExpanded ? null : label)}
+              style={[styles.dropdownTriggerBox, isActive && styles.activeDropdownTriggerBox]} 
+              onPress={() => {
+                setExpandedDropdown(isExpanded ? null : label);
+                setActiveField(label);
+              }}
               activeOpacity={0.7}
             >
               <AppText style={[styles.dropdownTriggerText, isPlaceholder && styles.dropdownPlaceholder]} numberOfLines={1}>{displayValue}</AppText>
@@ -162,6 +262,7 @@ export default function NewLeadScreen() {
                   onPress={() => {
                     onSelect(opt);
                     setExpandedDropdown(null);
+                    handleNext(label, opt);
                   }}
                   activeOpacity={0.7}
                 >
@@ -174,33 +275,41 @@ export default function NewLeadScreen() {
             </ScrollView>
           </View>
         )}
-      </View>
+      </FieldHighlight>
     );
   };
 
   const renderSearchableDropdown = (label: string, options: string[], selected: string, onSelect: (val: string) => void, isLast: boolean = false) => {
     const isExpanded = expandedDropdown === label;
+    const isActive = activeField === label;
     // Filter options based on typed text (must start with the typed letters, case-insensitive)
     const filteredOptions = options.filter(opt => opt.toLowerCase().startsWith(selected.toLowerCase()));
     
     return (
-      <View style={[styles.fieldContainer, isLast && { borderBottomWidth: 0 }, isExpanded && { zIndex: 1000 }]}>
+      <FieldHighlight isActive={isActive} isExpanded={isExpanded} isLast={isLast} theme={theme}>
         <View style={styles.fieldRow}>
           <AppText style={styles.fieldLabel}>{label}</AppText>
           <View style={styles.inputBoxContainer}>
-            <View style={[styles.dropdownTriggerBox, { paddingVertical: 0 }]}>
+            <View style={[styles.dropdownTriggerBox, { paddingVertical: 0 }, isActive && styles.activeDropdownTriggerBox]}>
               <TextInput
+                ref={(el) => { inputRefs.current[label] = el; }}
                 style={[styles.dropdownTriggerText, { flex: 1, paddingVertical: 10, outlineStyle: 'none' } as any]}
                 value={selected}
                 onChangeText={(val) => {
                   onSelect(val);
                   if (val.length > 0) setExpandedDropdown(label);
                 }}
-                onFocus={() => setExpandedDropdown(label)}
+                onFocus={() => {
+                  setExpandedDropdown(label);
+                  setActiveField(label);
+                }}
                 placeholder="Type or select..."
                 placeholderTextColor="#94a3b8"
               />
-              <TouchableOpacity onPress={() => setExpandedDropdown(isExpanded ? null : label)} style={{ padding: 10, marginRight: -10 }}>
+              <TouchableOpacity onPress={() => {
+                setExpandedDropdown(isExpanded ? null : label);
+                setActiveField(label);
+              }} style={{ padding: 10, marginRight: -10 }}>
                 <ChevronDown size={18} color="#94a3b8" style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }} />
               </TouchableOpacity>
             </View>
@@ -217,6 +326,7 @@ export default function NewLeadScreen() {
                   onPress={() => {
                     onSelect(opt);
                     setExpandedDropdown(null);
+                    handleNext(label, opt);
                   }}
                   activeOpacity={0.7}
                 >
@@ -229,19 +339,21 @@ export default function NewLeadScreen() {
             </ScrollView>
           </View>
         )}
-      </View>
+      </FieldHighlight>
     );
   };
 
   const renderTextInput = (label: string, value: string, onChange: (val: string) => void, placeholder: string, keyboardType: any = 'default', isLast: boolean = false, multiline: boolean = false, suffix?: any) => {
+    const isActive = activeField === label;
     return (
-      <View style={[styles.fieldContainer, isLast && { borderBottomWidth: 0 }]}>
+      <FieldHighlight isActive={isActive} isExpanded={false} isLast={isLast} theme={theme}>
         <View style={[styles.fieldRow, multiline && { minHeight: 80, alignItems: 'flex-start', paddingTop: 12 }]}>
           <AppText style={[styles.fieldLabel, multiline && { marginTop: 10 }]}>{label}</AppText>
           <View style={[styles.inputBoxContainer, multiline && { paddingVertical: 0 }]}>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
               <TextInput 
-                style={[styles.boxInput, { flex: 1 }, multiline && { minHeight: 64, textAlignVertical: 'top' }]} 
+                ref={(el) => { inputRefs.current[label] = el; }}
+                style={[styles.boxInput, { flex: 1 }, multiline && { minHeight: 64, textAlignVertical: 'top' }, isActive && styles.activeDropdownTriggerBox]} 
                 placeholder={placeholder}
                 placeholderTextColor="#94a3b8"
                 value={value}
@@ -250,6 +362,16 @@ export default function NewLeadScreen() {
                 textAlign="left"
                 multiline={multiline}
                 numberOfLines={multiline ? 2 : 1}
+                onFocus={() => {
+                  setActiveField(label);
+                  setExpandedDropdown(null);
+                }}
+                onSubmitEditing={() => {
+                  if (!multiline) {
+                    handleNext(label);
+                  }
+                }}
+                returnKeyType={label === 'Notes / Comments' ? 'default' : 'next'}
               />
               {suffix && (
                 typeof suffix === 'string' ? (
@@ -259,7 +381,7 @@ export default function NewLeadScreen() {
             </View>
           </View>
         </View>
-      </View>
+      </FieldHighlight>
     );
   };
 
@@ -337,13 +459,16 @@ export default function NewLeadScreen() {
           <AppText style={styles.sectionTitle}>Initial Follow-up (Optional)</AppText>
           <View style={[styles.formSection, { zIndex: 100 }]}>
             {renderTextInput('Notes / Comments', note, setNote, 'Add any initial remarks about this lead', 'default', false, true)}
-            <View style={[styles.fieldContainer, { borderBottomWidth: 0 }]}>
+            <FieldHighlight isActive={activeField === 'Next Follow-up'} isExpanded={false} isLast={true} theme={theme}>
               <View style={styles.fieldRow}>
                 <AppText style={styles.fieldLabel}>Next Follow-up</AppText>
                 <View style={styles.inputBoxContainer}>
                   <TouchableOpacity 
-                    style={[styles.dropdownTriggerBox, !nextVisit && { backgroundColor: theme.surfaceLight }]} 
-                    onPress={() => setShowDatePicker(true)}
+                    style={[styles.dropdownTriggerBox, !nextVisit && { backgroundColor: theme.surfaceLight }, activeField === 'Next Follow-up' && styles.activeDropdownTriggerBox]} 
+                    onPress={() => {
+                      setActiveField('Next Follow-up');
+                      setShowDatePicker(true);
+                    }}
                   >
                     <AppText style={[styles.dropdownTriggerText, !nextVisit && { color: theme.icon }]}>
                       {nextVisit ? `📅 ${new Date(nextVisit).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Select Date'}
@@ -352,7 +477,7 @@ export default function NewLeadScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </FieldHighlight>
           </View>
 
           <TouchableOpacity style={styles.saveButtonContainer} onPress={handleSave} activeOpacity={0.8}>
@@ -376,6 +501,7 @@ export default function NewLeadScreen() {
         onSave={(date, time) => {
           setNextVisit(date);
           setShowDatePicker(false);
+          setActiveField(''); // Clear active field when done
         }}
       />
     </SafeAreaView>
@@ -437,6 +563,10 @@ function getStyles(theme: any) { return StyleSheet.create({
     borderBottomColor: '#e2e8f0',
     backgroundColor: theme.surface,
   },
+  activeDropdownTriggerBox: {
+    borderColor: '#0ea5e9', // Brighter blue for the input border focus
+    borderWidth: 1.5,
+  },
   fieldRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -486,11 +616,11 @@ function getStyles(theme: any) { return StyleSheet.create({
     color: theme.divider,
   },
   dropdownFloatingBody: {
-    position: 'absolute',
-    top: '100%',
     marginTop: 4,
-    right: 16,
+    marginBottom: 12,
+    alignSelf: 'flex-end',
     width: '55%',
+    marginRight: 16,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.icon,
@@ -499,7 +629,7 @@ function getStyles(theme: any) { return StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
-    elevation: 24,
+    elevation: 4,
     zIndex: 9999,
   },
   dropdownFloatingOption: {

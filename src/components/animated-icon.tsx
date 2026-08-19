@@ -30,7 +30,15 @@ export function AnimatedSplashOverlay() {
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  const image = (
+    <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <Image style={{ width: 120, height: 120 }} source={require('@/assets/images/pooraj-icon.png')} contentFit="contain" />
+        <Animated.Text style={{ fontSize: 26, fontWeight: '800', color: '#0B2A7A', marginTop: 14, letterSpacing: 2.2 }}>POORAJ</Animated.Text>
+        <Animated.Text style={{ fontSize: 13.5, fontWeight: '600', color: '#475569', marginTop: 8, letterSpacing: 0.5, textAlign: 'center' }}>Where Leads Become Deals</Animated.Text>
+      </View>
+    </View>
+  );
 
   return animate ? (
     <Animated.View
@@ -101,7 +109,7 @@ export function AnimatedIcon() {
 
       <Animated.View entering={keyframe.duration(DURATION)} style={styles.background} />
       <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+        <Image style={styles.image} source={require('@/assets/images/pooraj-icon.png')} />
       </Animated.View>
     </View>
   );
@@ -137,7 +145,7 @@ const styles = StyleSheet.create({
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

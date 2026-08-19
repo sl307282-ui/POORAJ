@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Lead, FollowUp, Deal, LeadStatus } from '../models/types';
-import { supabase } from '../services/supabase';
 import { dummyLeads, dummyFollowUps, dummyDeals } from '../utils/dummyData';
 import { useSyncStore } from './syncStore';
 

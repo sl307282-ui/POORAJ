@@ -129,11 +129,11 @@ export function CustomDrawerContent(props: any) {
         {/* Minimalist Profile Header */}
         <View style={[styles.headerContainer, { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
           <View style={styles.profileContainer}>
-            <View style={[styles.avatar, { borderColor: theme.border, borderWidth: 1 }]}>
+            <View style={styles.avatar}>
               <Image 
                 source={require('../../assets/images/pooraj-icon.png')} 
-                style={{ width: '100%', height: '100%', borderRadius: 28 }} 
-                resizeMode="cover"
+                style={{ width: 48, height: 48 }} 
+                resizeMode="contain"
               />
             </View>
             <View style={styles.profileText}>
@@ -302,18 +302,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#ffffff',
+    width: 48,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    marginRight: 14,
   },
   profileText: {
     justifyContent: 'center',

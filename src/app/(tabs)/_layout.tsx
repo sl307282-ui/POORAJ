@@ -1,6 +1,5 @@
 import { useAppTheme } from '../../hooks/useAppTheme';
-import { Tabs } from 'expo-router';
-import { BlurView } from 'expo-blur';
+import { CustomTabs } from '../../components/CustomTabs';
 import { StyleSheet, View, Platform } from 'react-native';
 import { Home, Search, Calendar, User, Settings } from 'lucide-react-native';
 import { useThemeStore } from '../../store/themeStore';
@@ -10,31 +9,8 @@ export default function TabsLayout() {
   const { mode } = useThemeStore();
   const theme = useAppTheme();
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        animation: 'shift',
-        transitionSpec: {
-          animation: 'timing',
-          config: { duration: 100 }
-        },
-        tabBarStyle: [styles.tabBar, { 
-          borderTopColor: theme.border,
-          backgroundColor: mode === 'dark' ? 'rgba(15, 23, 42, 0.75)' : 'rgba(255, 255, 255, 0.75)'
-        }],
-        tabBarBackground: () => (
-          Platform.OS === 'web' ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: mode === 'dark' ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
-          ) : (
-            <BlurView intensity={mode === 'dark' ? 50 : 80} tint={mode === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-          )
-        ),
-        tabBarActiveTintColor: theme.primaryDark,
-        tabBarInactiveTintColor: theme.textSecondary,
-        tabBarShowLabel: false,
-      }}
-    >
-      <Tabs.Screen
+    <CustomTabs>
+      <CustomTabs.Screen
         name="index"
         options={{
           title: 'Dashboard',
@@ -45,7 +21,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+      <CustomTabs.Screen
         name="search"
         options={{
           title: 'Search',
@@ -56,7 +32,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+      <CustomTabs.Screen
         name="calendar"
         options={{
           title: 'Calendar',
@@ -67,7 +43,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+      <CustomTabs.Screen
         name="profile"
         options={{
           title: 'Profile & Settings',
@@ -78,7 +54,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-    </Tabs>
+    </CustomTabs>
   );
 }
 

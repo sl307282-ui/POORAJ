@@ -7,13 +7,6 @@
     "icon": "./assets/images/pooraj-icon.png",
     "scheme": "pooraj",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/images/pooraj-icon.png",
-      "bundleIdentifier": "com.pooraj.crm",
-      "infoPlist": {
-        "LSApplicationQueriesSchemes": ["whatsapp", "tel", "telprompt"]
-      }
-    },
     "android": {
       "package": "com.pooraj.crm",
       "adaptiveIcon": {
@@ -24,21 +17,17 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
           "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/pooraj-splash-final-v2.jpg",
+          "image": "./assets/images/pooraj-icon.png",
           "resizeMode": "contain",
           "dark": {
             "backgroundColor": "#FFFFFF",
-            "image": "./assets/images/pooraj-splash-final-v2.jpg"
+            "image": "./assets/images/pooraj-icon.png"
           }
         }
       ],

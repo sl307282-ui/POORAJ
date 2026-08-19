@@ -127,20 +127,14 @@ export default function LeadDetailScreen() {
   };
 
   const handleDeleteFollowUp = (followUpId: string) => {
-    if (Platform.OS === 'web') {
-      if (window.confirm("Are you sure you want to delete this follow-up? This action cannot be undone.")) {
-        deleteFollowUp(followUpId);
-      }
-    } else {
-      Alert.alert(
-        "Delete Follow-up",
-        "Are you sure you want to delete this follow-up? This action cannot be undone.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: () => deleteFollowUp(followUpId) }
-        ]
-      );
-    }
+    Alert.alert(
+      "Delete Follow-up",
+      "Are you sure you want to delete this follow-up? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => deleteFollowUp(followUpId) }
+      ]
+    );
   };
 
   if (!lead) {
@@ -164,28 +158,21 @@ export default function LeadDetailScreen() {
 
   const handleDeleteContact = () => {
     setShowContactMenu(false);
-    if (Platform.OS === 'web') {
-      if (window.confirm("Are you sure you want to delete this contact? This action cannot be undone.")) {
-        deleteLead(id as string);
-        router.push('/(tabs)');
-      }
-    } else {
-      Alert.alert(
-        "Delete Contact",
-        "Are you sure you want to delete this contact? This action cannot be undone.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Delete", 
-            style: "destructive",
-            onPress: () => {
-              deleteLead(id as string);
-              router.push('/(tabs)');
-            }
+    Alert.alert(
+      "Delete Contact",
+      "Are you sure you want to delete this contact? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: () => {
+            deleteLead(id as string);
+            router.push('/(tabs)');
           }
-        ]
-      );
-    }
+        }
+      ]
+    );
   };
 
   const handleEditContact = () => {
@@ -197,7 +184,7 @@ export default function LeadDetailScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={undefined}
       >
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -391,10 +378,10 @@ export default function LeadDetailScreen() {
           animationType="slide"
           presentationStyle="pageSheet"
           onRequestClose={() => setShowHistoryModal(false)}
-          transparent={Platform.OS === 'web'}
+          transparent={false}
         >
-          <View style={Platform.OS === 'web' ? styles.webModalOverlay : { flex: 1 }}>
-            <SafeAreaView style={[styles.historyModalContainer, Platform.OS === 'web' && styles.webModalFrame]}>
+          <View style={{ flex: 1 }}>
+            <SafeAreaView style={[styles.historyModalContainer]}>
             <View style={styles.historyModalHeader}>
               <TouchableOpacity onPress={() => setShowHistoryModal(false)} style={styles.historyModalCloseButton}>
                 <ChevronLeft size={24} color="#0f172a" />
@@ -483,7 +470,7 @@ export default function LeadDetailScreen() {
           activeOpacity={1} 
           onPressOut={() => setShowContactMenu(false)}
         >
-          <View style={Platform.OS === 'web' ? styles.webMenuFrame : { flex: 1, position: 'relative', width: '100%' }}>
+          <View style={{ flex: 1, position: 'relative', width: '100%' }}>
             <View style={styles.contactMenuContainer}>
               <TouchableOpacity style={styles.menuItem} onPress={handleEditContact}>
                 <Pencil size={18} color="#0f172a" style={styles.menuIcon} />
@@ -504,12 +491,12 @@ export default function LeadDetailScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowAddFollowUpModal(false)}
-        transparent={Platform.OS === 'web'}
+        transparent={false}
       >
-        <View style={Platform.OS === 'web' ? styles.webModalOverlay : { flex: 1 }}>
+        <View style={{ flex: 1 }}>
           <KeyboardAvoidingView 
-            style={[{ flex: 1, backgroundColor: theme.surface }, Platform.OS === 'web' && styles.webModalFrame]} 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={[{ flex: 1, backgroundColor: theme.surface }]} 
+            behavior={undefined}
           >
             <View style={styles.modalHeader}>
               <AppText style={styles.modalTitle}>{editingFollowUpId ? 'Edit Follow-up Result' : 'Follow-up Result'}</AppText>
@@ -987,7 +974,7 @@ function getStyles(theme: any) { return StyleSheet.create({
   menuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    alignItems: 'stretch',
   },
   webMenuFrame: {
     width: '100%',
@@ -997,7 +984,7 @@ function getStyles(theme: any) { return StyleSheet.create({
   },
   contactMenuContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 100 : 80,
+    top: 80,
     right: 16,
     backgroundColor: theme.surface,
     borderRadius: 12,

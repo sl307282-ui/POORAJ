@@ -21,8 +21,20 @@ export default function SearchScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const filterParam = params.filter as string;
+  const resetParam = params.reset as string;
   
   const [searchQuery, setSearchQuery] = useState('');
+
+  React.useEffect(() => {
+    if (resetParam) {
+      setSearchQuery('');
+      setFilterStatus(null);
+      setFilterCustomerType(null);
+      setFilterDateAdded(null);
+      setIsSelectionMode(false);
+      setSelectedLeads([]);
+    }
+  }, [resetParam]);
   const { leads, followUps, deals, updateLeadStatus, addFollowUp, addDeal } = useLeadStore();
   const insets = useSafeAreaInsets();
 
@@ -762,12 +774,12 @@ export default function SearchScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowUpdateModal(false)}
-        transparent={Platform.OS === 'web'}
+        transparent={false}
       >
-        <View style={Platform.OS === 'web' ? styles.webModalOverlay : { flex: 1 }}>
+        <View style={{ flex: 1 }}>
           <KeyboardAvoidingView 
-            style={[{ flex: 1, backgroundColor: theme.surface }, Platform.OS === 'web' && styles.webModalFrame]} 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={[{ flex: 1, backgroundColor: theme.surface }]} 
+            behavior={undefined}
           >
             <View style={styles.modalHeader}>
               <AppText style={styles.modalTitle}>Follow-up Result</AppText>
@@ -931,7 +943,7 @@ function getStyles(theme: any) { return StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
-    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    alignItems: 'stretch',
   },
   filterModalContent: {
     backgroundColor: theme.surface,

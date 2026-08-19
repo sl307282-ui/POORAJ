@@ -1,5 +1,5 @@
 import { Lead, FollowUp, Deal } from '../models/types';
-import { v4 as uuidv4 } from 'uuid'; // need to install uuid or just use random string
+
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
 const today = new Date().toISOString().split('T')[0];

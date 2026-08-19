@@ -2,7 +2,7 @@ import 'react-native-gesture-handler';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { Drawer } from 'expo-router/drawer';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { CustomDrawerContent } from '../components/CustomDrawerContent';
 import { useThemeStore } from '../store/themeStore';
 import { useSettingsStore } from '../store/settingsStore';
@@ -30,7 +30,6 @@ Notifications.setNotificationHandler({
 });
 
 export default function RootLayout() {
-  const isWeb = Platform.OS === 'web';
   const { mode } = useThemeStore();
   const pushNotifications = useSettingsStore(state => state.pushNotifications);
   const theme = useAppTheme();
@@ -86,53 +85,30 @@ export default function RootLayout() {
 
   return (
     <View 
-      style={[styles.outerContainer, { backgroundColor: mode === 'dark' ? '#000000' : '#f1f5f9' }]}
+      style={[styles.container, { backgroundColor: theme.surface }]}
       onLayout={onLayoutRootView}
     >
-      <View style={[styles.container, isWeb && styles.webMobileFrame, { backgroundColor: theme.surface }]}>
-        <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
-        
-        <Drawer 
-          drawerContent={(props) => <CustomDrawerContent {...props} />}
-          screenOptions={{ 
-            headerShown: false,
-            drawerType: 'front',
-            drawerStyle: {
-              width: isWeb ? 300 : '80%',
-              backgroundColor: theme.surface,
-            }
-          }}
-        >
-          <Drawer.Screen name="(tabs)" options={{ headerShown: false }} />
-        </Drawer>
-      </View>
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <Drawer 
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+        screenOptions={{ 
+          headerShown: false,
+          drawerType: 'front',
+          drawerStyle: {
+            width: '80%',
+            backgroundColor: theme.surface,
+          }
+        }}
+      >
+        <Drawer.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Drawer>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  outerContainer: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center', 
-    justifyContent: 'center',
-  },
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
-    width: '100%',
   },
-  webMobileFrame: {
-    maxWidth: 400,
-    maxHeight: 850,
-    borderWidth: 8,
-    borderColor: '#e2e8f0',
-    borderRadius: 40,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.1,
-    shadowRadius: 30,
-    marginVertical: 20,
-  }
 });

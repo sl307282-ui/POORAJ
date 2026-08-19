@@ -390,11 +390,11 @@ const styles = StyleSheet.create({
     color: '#cbd5e1',
   },
   dropdownFloatingBody: {
-    position: 'absolute',
-    top: '100%',
     marginTop: 4,
-    right: 16,
+    marginBottom: 12,
+    alignSelf: 'flex-end',
     width: '55%',
+    marginRight: 16,
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#94a3b8',
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
-    elevation: 24,
+    elevation: 4,
     zIndex: 9999,
   },
   dropdownFloatingOption: {
