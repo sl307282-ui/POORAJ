@@ -34,7 +34,7 @@ export function AnimatedSplashOverlay() {
     <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ alignItems: 'center', justifyContent: 'center' }}>
         <Image style={{ width: 120, height: 120 }} source={require('@/assets/images/pooraj-icon.png')} contentFit="contain" />
-        <Animated.Text style={{ fontSize: 26, fontWeight: '800', color: '#0B2A7A', marginTop: 14, letterSpacing: 2.2 }}>POORAJ</Animated.Text>
+        <Animated.Text style={{ fontSize: 26, fontWeight: '800', color: '#0B2A7A', marginTop: 14, letterSpacing: 2.2 }}>POOROJ</Animated.Text>
         <Animated.Text style={{ fontSize: 13.5, fontWeight: '600', color: '#475569', marginTop: 8, letterSpacing: 0.5, textAlign: 'center' }}>Where Leads Become Deals</Animated.Text>
       </View>
     </View>

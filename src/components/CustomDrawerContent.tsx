@@ -100,14 +100,14 @@ export function CustomDrawerContent(props: any) {
   const handleShareUs = async () => {
     try {
       if (Platform.OS === 'web') {
-        window.alert("Share POORAJ CRM with your team! (Sharing link copied to clipboard)");
+        window.alert("Share POOROJ CRM with your team! (Sharing link copied to clipboard)");
         return;
       }
       
       const result = await Share.share({
-        message: 'Check out POORAJ - Where Leads Become Deals! Download the app to manage your real estate leads efficiently: https://pooraj.com/download',
-        title: 'POORAJ CRM',
-        url: 'https://pooraj.com/download'
+        message: 'Check out POOROJ - Where Leads Become Deals! Download the app to manage your real estate leads efficiently: https://pooroj.com/download',
+        title: 'POOROJ CRM',
+        url: 'https://pooroj.com/download'
       });
 
       if (result.action === Share.sharedAction) {
@@ -137,7 +137,7 @@ export function CustomDrawerContent(props: any) {
               />
             </View>
             <View style={styles.profileText}>
-              <AppText style={[styles.name, { color: theme.text }]}>POORAJ</AppText>
+              <AppText style={[styles.name, { color: theme.text }]}>POOROJ</AppText>
               <AppText style={[styles.tagline, { color: theme.textSecondary }]} numberOfLines={1}>Where Leads Become Deals</AppText>
             </View>
           </View>

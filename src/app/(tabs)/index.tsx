@@ -57,7 +57,7 @@ export default function Dashboard() {
         </TouchableOpacity>
         
         <View style={styles.headerTextContainer}>
-          <AppText style={[styles.headerTitle, { color: theme.text }]}>POORAJ</AppText>
+          <AppText style={[styles.headerTitle, { color: theme.text }]}>POOROJ</AppText>
         </View>
         
       </View>

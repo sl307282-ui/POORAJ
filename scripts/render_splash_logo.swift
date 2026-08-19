@@ -32,8 +32,8 @@ func drawFullUnifiedSplashLogo(width: Int, height: Int) -> NSImage {
     
     ctx.draw(cgMaster, in: CGRect(x: logoX, y: logoY, width: logoSize, height: logoSize))
     
-    // 2. Title "POORAJ" directly below logo
-    let titleStr = "POORAJ"
+    // 2. Title "POOROJ" directly below logo
+    let titleStr = "POOROJ"
     let titleFont = NSFont.systemFont(ofSize: w * 0.058, weight: .bold)
     let titleColor = NSColor(red: 11/255.0, green: 42/255.0, blue: 122/255.0, alpha: 1.0) // #0B2A7A
     
