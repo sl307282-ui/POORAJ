@@ -1,36 +1,74 @@
-import { useAppTheme } from '../hooks/useAppTheme';
+import { useAppTheme, ACCENT_COLORS } from '../hooks/useAppTheme';
 import { AppText } from '../components/AppText';
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Switch, Modal, Pressable, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Switch, Modal, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   ChevronLeft, Edit2, Users, CalendarClock, CheckCircle, 
-  Settings, MessageCircle, Bell, Palette, Globe, 
-  LayoutDashboard, Shield, Lock, Activity, LogOut, ChevronRight
+  MessageCircle, Bell, LogOut, ChevronRight,
+  Palette, Type, Check
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '../store/settingsStore';
-import { useThemeStore } from '../store/themeStore';
+import { useThemeStore, AccentColor, Typography } from '../store/themeStore';
 import { useLeadStore } from '../store/leadStore';
-import { Colors } from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
+
+const getInitials = (text: string, fallback: string) => {
+  const clean = (text || '').trim();
+  if (!clean) return fallback;
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return parts[0].substring(0, 2).toUpperCase();
+  }
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+};
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { mode, toggleTheme } = useThemeStore();
   const theme = useAppTheme();
+  const { user, role, userData, logout } = useAuth();
+  const isAdmin = role === 'admin';
   
   const settingsStore = useSettingsStore();
+  const { accentColor, setAccentColor, typography, setTypography } = useThemeStore();
   const { leads, followUps } = useLeadStore();
 
+  const accentColorsList: AccentColor[] = ['Sunset', 'Ocean', 'Rose', 'Deep', 'Emerald', 'Burgundy', 'Royal', 'Amber', 'Graphite', 'Slate'];
+  const typographyList: Typography[] = ['System Default', 'Modern', 'Classic', 'Geometric', 'Elegant'];
+
+  const [adminCompanyName, setAdminCompanyName] = useState(settingsStore.companyName || 'ABC Properties');
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   // Modals state
   const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [tempName, setTempName] = useState(settingsStore.agentName);
-  const [tempRole, setTempRole] = useState(settingsStore.agentRole);
+  const [tempCompanyName, setTempCompanyName] = useState(settingsStore.companyName || 'ABC Properties');
+  const [tempName, setTempName] = useState(userData?.name || settingsStore.agentName || 'Rahul Sharma');
+  const [tempRole, setTempRole] = useState(userData?.jobRole || settingsStore.agentRole || 'Sales Executive');
 
-  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  const [tempPass, setTempPass] = useState('');
+  useEffect(() => {
+    if (isAdmin && userData?.teamId) {
+      getDoc(doc(db, 'teams', userData.teamId)).then((snap) => {
+        if (snap.exists() && snap.data()?.name) {
+          setAdminCompanyName(snap.data().name);
+          settingsStore.setCompanyName(snap.data().name);
+        }
+      }).catch(console.error);
+    }
+  }, [isAdmin, userData?.teamId]);
+
+  // Profile Card Titles & Initials
+  const profileTitle = isAdmin 
+    ? (adminCompanyName || settingsStore.companyName || 'ABC Properties')
+    : (userData?.name || settingsStore.agentName || 'Rahul Sharma');
+
+  const profileSubtitle = isAdmin 
+    ? 'Admin'
+    : (userData?.jobRole || userData?.memberRole || settingsStore.agentRole || 'Sales Executive');
+
+  const avatarInitials = getInitials(profileTitle, isAdmin ? 'AP' : 'RS');
 
   // Metrics calculation
   const today = new Date().toISOString().split('T')[0];
@@ -43,20 +81,57 @@ export default function SettingsScreen() {
     setExpandedSection(expandedSection === section ? null : section);
   };
 
-  const handleSaveProfile = () => {
-    const initials = tempName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'JD';
-    settingsStore.setAgentProfile(tempName, tempRole, initials);
+  const handleOpenEdit = () => {
+    if (isAdmin) {
+      setTempCompanyName(profileTitle);
+    } else {
+      setTempName(profileTitle);
+      setTempRole(profileSubtitle);
+    }
+    setProfileModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (isAdmin) {
+      const trimmed = tempCompanyName.trim() || 'ABC Properties';
+      settingsStore.setCompanyName(trimmed);
+      setAdminCompanyName(trimmed);
+      if (userData?.teamId) {
+        try {
+          await updateDoc(doc(db, 'teams', userData.teamId), { name: trimmed });
+        } catch (err) {
+          console.error('Failed to update company name in Firestore:', err);
+        }
+      }
+    } else {
+      const trimmedName = tempName.trim() || 'Rahul Sharma';
+      const trimmedRole = tempRole.trim() || 'Sales Executive';
+      const initials = getInitials(trimmedName, 'RS');
+      settingsStore.setAgentProfile(trimmedName, trimmedRole, initials);
+      if (user?.uid) {
+        try {
+          await updateDoc(doc(db, 'users', user.uid), {
+            name: trimmedName,
+            jobRole: trimmedRole,
+          });
+        } catch (err) {
+          console.error('Failed to update user profile in Firestore:', err);
+        }
+      }
+    }
     setProfileModalVisible(false);
   };
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       { 
-        text: 'Log Out', 
+        text: 'Sign out', 
         style: 'destructive',
         onPress: () => {
-          Alert.alert('Logged Out', 'Your session has been cleared. (Simulated)');
+          logout().then(() => {
+            useLeadStore.getState().clearData();
+          });
         }
       }
     ]);
@@ -78,24 +153,20 @@ export default function SettingsScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
-        {/* Agent Profile Card */}
+        {/* Upper Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.profileInfoRow}>
             <View style={[styles.avatarContainer, { backgroundColor: theme.primaryDark + '20' }]}>
-              <AppText style={[styles.avatarText, { color: theme.primaryDark }]}>{settingsStore.agentInitials}</AppText>
+              <AppText style={[styles.avatarText, { color: theme.primaryDark }]}>{avatarInitials}</AppText>
               <View style={[styles.activeStatusDot, { borderColor: theme.surface }]} />
             </View>
             <View style={styles.profileDetails}>
-              <AppText style={[styles.agentName, { color: theme.text }]}>{settingsStore.agentName}</AppText>
-              <AppText style={[styles.agentRole, { color: theme.textSecondary }]}>{settingsStore.agentRole}</AppText>
+              <AppText style={[styles.agentName, { color: theme.text }]}>{profileTitle}</AppText>
+              <AppText style={[styles.agentRole, { color: theme.textSecondary }]}>{profileSubtitle}</AppText>
             </View>
             <TouchableOpacity 
               style={[styles.editButton, { backgroundColor: theme.surfaceLight }]}
-              onPress={() => {
-                setTempName(settingsStore.agentName);
-                setTempRole(settingsStore.agentRole);
-                setProfileModalVisible(true);
-              }}
+              onPress={handleOpenEdit}
             >
               <Edit2 size={16} color={theme.textSecondary} />
             </TouchableOpacity>
@@ -131,47 +202,6 @@ export default function SettingsScreen() {
         {/* Workspace */}
         <AppText style={[styles.sectionHeading, { color: theme.text }]}>Workspace</AppText>
         <View style={[styles.settingsGroup, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <SettingsRow icon={<Settings size={20} color={theme.icon} />} title="Lead Preferences" theme={theme} onPress={() => toggleSection('lead')} expanded={expandedSection === 'lead'} value={settingsStore.defaultLeadStatus} />
-          
-          {expandedSection === 'lead' && (
-            <View style={[styles.expandedContent, { backgroundColor: theme.surfaceLight }]}>
-              <AppText style={[styles.subText, { color: theme.textSecondary, marginBottom: 12 }]}>Default Lead Status</AppText>
-              <View style={styles.methodSelector}>
-                {['Fresh', 'Visited Customer', 'Existing Customer'].map((status) => (
-                  <TouchableOpacity 
-                    key={status}
-                    style={[styles.methodOption, { borderColor: theme.border, backgroundColor: theme.surface }, settingsStore.defaultLeadStatus === status && { borderColor: theme.primaryDark, backgroundColor: theme.primaryDark + '10' }]}
-                    onPress={() => settingsStore.setDefaultLeadStatus(status)}
-                  >
-                    <AppText style={[styles.methodOptionText, { color: theme.textSecondary }, settingsStore.defaultLeadStatus === status && { color: theme.primaryDark }]}>{status}</AppText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-          
-          <SettingsRow icon={<CalendarClock size={20} color={theme.icon} />} title="Follow-up Settings" theme={theme} onPress={() => toggleSection('followup')} expanded={expandedSection === 'followup'} value={settingsStore.defaultReminderTime} />
-          {expandedSection === 'followup' && (
-            <View style={[styles.expandedContent, { backgroundColor: theme.surfaceLight }]}>
-              <AppText style={[styles.subText, { color: theme.textSecondary, marginBottom: 12 }]}>Default Reminder Time</AppText>
-              <View style={styles.methodSelector}>
-                {['09:00 AM', '10:00 AM', '02:00 PM'].map((time) => (
-                  <TouchableOpacity 
-                    key={time}
-                    style={[styles.methodOption, { borderColor: theme.border, backgroundColor: theme.surface }, settingsStore.defaultReminderTime === time && { borderColor: theme.primaryDark, backgroundColor: theme.primaryDark + '10' }]}
-                    onPress={() => settingsStore.setDefaultReminderTime(time)}
-                  >
-                    <AppText style={[styles.methodOptionText, { color: theme.textSecondary }, settingsStore.defaultReminderTime === time && { color: theme.primaryDark }]}>{time}</AppText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-          
           <SettingsRow 
             icon={<MessageCircle size={20} color={theme.icon} />} 
             title="WhatsApp & Messaging" 
@@ -236,7 +266,7 @@ export default function SettingsScreen() {
 
           <View style={[styles.divider, { backgroundColor: theme.divider }]} />
           
-          <SettingsRow icon={<Bell size={20} color={theme.icon} />} title="Notifications" theme={theme} isLast onPress={() => toggleSection('notifications')} expanded={expandedSection === 'notifications'} />
+          <SettingsRow icon={<Bell size={20} color={theme.icon} />} title="Notifications" theme={theme} onPress={() => toggleSection('notifications')} expanded={expandedSection === 'notifications'} />
           {expandedSection === 'notifications' && (
             <View style={[styles.expandedContent, { backgroundColor: theme.surfaceLight }]}>
               <View style={styles.settingsRow}>
@@ -245,63 +275,107 @@ export default function SettingsScreen() {
               </View>
             </View>
           )}
-        </View>
 
-        {/* Personalization */}
-        <AppText style={[styles.sectionHeading, { color: theme.text }]}>Personalization</AppText>
-        <View style={[styles.settingsGroup, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={styles.settingsRow}>
-            <View style={styles.settingsRowLeft}>
-              <Palette size={20} color={theme.icon} />
-              <AppText style={[styles.settingsRowTitle, { color: theme.text }]}>Dark Mode</AppText>
-            </View>
-            <Switch 
-              value={mode === 'dark'}
-              onValueChange={toggleTheme}
-              trackColor={{ false: '#94a3b8', true: theme.primary }}
-              thumbColor="#ffffff"
-              ios_backgroundColor="#94a3b8"
-              style={{ transform: Platform.OS === 'ios' ? [{ scale: 0.9 }] : undefined }}
-            />
-          </View>
           <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-          
-          <SettingsRow icon={<Globe size={20} color={theme.icon} />} title="Language" theme={theme} value={settingsStore.language} onPress={() => toggleSection('lang')} expanded={expandedSection === 'lang'} />
-          {expandedSection === 'lang' && (
+
+          {/* Accent Color Section */}
+          <SettingsRow 
+            icon={<Palette size={20} color={theme.icon} />} 
+            title="Accent Color" 
+            theme={theme} 
+            value={
+              <View style={[styles.currentColorIndicator, { backgroundColor: ACCENT_COLORS[accentColor]?.primary || theme.primaryDark }]} />
+            }
+            onPress={() => toggleSection('accentColor')} 
+            expanded={expandedSection === 'accentColor'} 
+          />
+          {expandedSection === 'accentColor' && (
             <View style={[styles.expandedContent, { backgroundColor: theme.surfaceLight }]}>
-              <View style={styles.methodSelector}>
-                {['English (US)', 'Spanish (ES)', 'French (FR)'].map((lang) => (
-                  <TouchableOpacity 
-                    key={lang}
-                    style={[styles.methodOption, { borderColor: theme.border, backgroundColor: theme.surface }, settingsStore.language === lang && { borderColor: theme.primaryDark, backgroundColor: theme.primaryDark + '10' }]}
-                    onPress={() => settingsStore.setLanguage(lang)}
-                  >
-                    <AppText style={[styles.methodOptionText, { color: theme.textSecondary }, settingsStore.language === lang && { color: theme.primaryDark }]}>{lang.split(' ')[0]}</AppText>
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.colorGrid}>
+                {accentColorsList.map((colorName) => {
+                  const colorObj = ACCENT_COLORS[colorName];
+                  const isSelected = accentColor === colorName;
+                  return (
+                    <View key={colorName} style={styles.colorItemContainer}>
+                      <TouchableOpacity 
+                        style={[
+                          styles.colorCircle, 
+                          { backgroundColor: colorObj.primary },
+                          isSelected && [styles.selectedColorCircle, { borderColor: theme.text }]
+                        ]}
+                        onPress={() => setAccentColor(colorName)}
+                        activeOpacity={0.8}
+                      >
+                        {isSelected && <Check size={16} color="#ffffff" />}
+                      </TouchableOpacity>
+                      <AppText style={[styles.colorName, { color: isSelected ? theme.text : theme.textSecondary, fontWeight: isSelected ? '600' : '400' }]}>
+                        {colorName}
+                      </AppText>
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}
 
           <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-          
-          <SettingsRow icon={<LayoutDashboard size={20} color={theme.icon} />} title="Dashboard Preferences" theme={theme} isLast onPress={() => toggleSection('dash')} expanded={expandedSection === 'dash'} />
-          {expandedSection === 'dash' && (
+
+          {/* Typography Section */}
+          <SettingsRow 
+            icon={<Type size={20} color={theme.icon} />} 
+            title="Typography" 
+            theme={theme} 
+            value={typography}
+            isLast 
+            onPress={() => toggleSection('typography')} 
+            expanded={expandedSection === 'typography'} 
+          />
+          {expandedSection === 'typography' && (
             <View style={[styles.expandedContent, { backgroundColor: theme.surfaceLight }]}>
-              <View style={styles.settingsRow}>
-                <AppText style={[styles.subText, { color: theme.text, flex: 1 }]}>Show Metrics on Home</AppText>
-                <Switch value={settingsStore.showMetricsOnHome} onValueChange={(v) => settingsStore.setDashboardPreferences(v, settingsStore.compactView)} trackColor={{ false: theme.border, true: theme.primaryDark }} />
-              </View>
-              <View style={styles.settingsRow}>
-                <AppText style={[styles.subText, { color: theme.text, flex: 1 }]}>Compact View</AppText>
-                <Switch value={settingsStore.compactView} onValueChange={(v) => settingsStore.setDashboardPreferences(settingsStore.showMetricsOnHome, v)} trackColor={{ false: theme.border, true: theme.primaryDark }} />
+              <View style={styles.typographyList}>
+                {typographyList.map((type) => {
+                  const isSelected = typography === type;
+                  let subtitle = '';
+                  if (type === 'Modern') subtitle = 'Outfit / Inter';
+                  if (type === 'Classic') subtitle = 'Playfair / Lora';
+                  if (type === 'Geometric') subtitle = 'Montserrat / Open Sans';
+                  if (type === 'Elegant') subtitle = 'Cinzel / Lato';
+
+                  return (
+                    <TouchableOpacity 
+                      key={type} 
+                      style={[styles.typographyRow, { borderTopColor: theme.border }]}
+                      onPress={() => setTypography(type)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.radioCircle, { borderColor: isSelected ? theme.primaryDark : theme.border }]}>
+                        {isSelected && <View style={[styles.radioInner, { backgroundColor: theme.primaryDark }]} />}
+                      </View>
+                      <View style={styles.typographyTextContainer}>
+                        <AppText style={[styles.typographyText, { color: theme.text, fontWeight: isSelected ? '600' : '400' }]}>
+                          {type}
+                        </AppText>
+                        {subtitle ? <AppText style={[styles.typographySubtitle, { color: theme.textSecondary }]}>{subtitle}</AppText> : null}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           )}
         </View>
 
+        {/* Sign Out Button */}
+        <View style={{ paddingHorizontal: 4, marginTop: 12 }}>
+          <TouchableOpacity 
+            style={[styles.logoutButton, { backgroundColor: '#fee2e2' }]} 
+            onPress={handleLogout}
+          >
+            <LogOut size={20} color="#ef4444" style={{ marginRight: 8 }} />
+            <AppText style={[styles.logoutText, { color: '#ef4444' }]}>Sign out</AppText>
+          </TouchableOpacity>
+        </View>
 
-        
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -309,27 +383,46 @@ export default function SettingsScreen() {
       <Modal visible={profileModalVisible} transparent animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setProfileModalVisible(false)}>
           <Pressable style={[styles.modalCard, { backgroundColor: theme.surface }]} onPress={(e) => e.stopPropagation()}>
-            <AppText style={[styles.apiSettingsTitle, { color: theme.text }]}>Edit Profile</AppText>
+            <AppText style={[styles.apiSettingsTitle, { color: theme.text }]}>
+              {isAdmin ? 'Edit Company Profile' : 'Edit Profile'}
+            </AppText>
             
-            <View style={styles.inputGroup}>
-              <AppText style={[styles.inputLabel, { color: theme.textSecondary }]}>Full Name</AppText>
-              <TextInput
-                style={[styles.textInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                value={tempName}
-                onChangeText={setTempName}
-                placeholderTextColor={theme.icon}
-              />
-            </View>
+            {isAdmin ? (
+              <View style={styles.inputGroup}>
+                <AppText style={[styles.inputLabel, { color: theme.textSecondary }]}>Company Name</AppText>
+                <TextInput
+                  style={[styles.textInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                  value={tempCompanyName}
+                  onChangeText={setTempCompanyName}
+                  placeholder="Enter company name"
+                  placeholderTextColor={theme.icon}
+                />
+              </View>
+            ) : (
+              <>
+                <View style={styles.inputGroup}>
+                  <AppText style={[styles.inputLabel, { color: theme.textSecondary }]}>Full Name</AppText>
+                  <TextInput
+                    style={[styles.textInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                    value={tempName}
+                    onChangeText={setTempName}
+                    placeholder="Enter full name"
+                    placeholderTextColor={theme.icon}
+                  />
+                </View>
 
-            <View style={styles.inputGroup}>
-              <AppText style={[styles.inputLabel, { color: theme.textSecondary }]}>Job Role</AppText>
-              <TextInput
-                style={[styles.textInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                value={tempRole}
-                onChangeText={setTempRole}
-                placeholderTextColor={theme.icon}
-              />
-            </View>
+                <View style={styles.inputGroup}>
+                  <AppText style={[styles.inputLabel, { color: theme.textSecondary }]}>Job Role / Designation</AppText>
+                  <TextInput
+                    style={[styles.textInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                    value={tempRole}
+                    onChangeText={setTempRole}
+                    placeholder="e.g. Sales Executive"
+                    placeholderTextColor={theme.icon}
+                  />
+                </View>
+              </>
+            )}
 
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
               <TouchableOpacity style={{ padding: 12, marginRight: 8 }} onPress={() => setProfileModalVisible(false)}>
@@ -337,39 +430,6 @@ export default function SettingsScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={{ padding: 12, backgroundColor: theme.primaryDark, borderRadius: 8 }} onPress={handleSaveProfile}>
                 <AppText style={{ color: '#fff', fontWeight: '600' }}>Save Changes</AppText>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Password Modal */}
-      <Modal visible={passwordModalVisible} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => setPasswordModalVisible(false)}>
-          <Pressable style={[styles.modalCard, { backgroundColor: theme.surface }]} onPress={(e) => e.stopPropagation()}>
-            <AppText style={[styles.apiSettingsTitle, { color: theme.text }]}>Change Password</AppText>
-            
-            <View style={styles.inputGroup}>
-              <AppText style={[styles.inputLabel, { color: theme.textSecondary }]}>New Password</AppText>
-              <TextInput
-                style={[styles.textInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                value={tempPass}
-                onChangeText={setTempPass}
-                secureTextEntry
-                placeholder="Enter new password"
-                placeholderTextColor={theme.icon}
-              />
-            </View>
-
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
-              <TouchableOpacity style={{ padding: 12, marginRight: 8 }} onPress={() => setPasswordModalVisible(false)}>
-                <AppText style={{ color: theme.textSecondary, fontWeight: '600' }}>Cancel</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity style={{ padding: 12, backgroundColor: theme.primaryDark, borderRadius: 8 }} onPress={() => {
-                Alert.alert('Success', 'Password updated successfully!');
-                setPasswordModalVisible(false);
-              }}>
-                <AppText style={{ color: '#fff', fontWeight: '600' }}>Update</AppText>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -388,7 +448,11 @@ const SettingsRow = ({ icon, title, theme, value, onPress, isLast, expanded }: a
       <AppText style={[styles.settingsRowTitle, { color: theme.text }]}>{title}</AppText>
     </View>
     <View style={styles.settingsRowRight}>
-      {value && <AppText style={[styles.settingsRowValue, { color: theme.textSecondary }]}>{value}</AppText>}
+      {React.isValidElement(value) ? (
+        value
+      ) : value ? (
+        <AppText style={[styles.settingsRowValue, { color: theme.textSecondary }]}>{value}</AppText>
+      ) : null}
       <ChevronRight 
         size={20} 
         color={theme.icon} 
@@ -659,5 +723,72 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ef4444',
     marginLeft: 8,
+  },
+
+  // Accent Color & Typography in Settings
+  currentColorIndicator: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginRight: 8,
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingTop: 4,
+  },
+  colorItemContainer: {
+    alignItems: 'center',
+    width: 52,
+    marginBottom: 8,
+  },
+  colorCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  selectedColorCircle: {
+    borderWidth: 2.5,
+  },
+  colorName: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  typographyList: {
+    paddingTop: 4,
+  },
+  typographyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  radioCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    marginRight: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  typographyTextContainer: {
+    flex: 1,
+  },
+  typographyText: {
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  typographySubtitle: {
+    fontSize: 11,
   },
 });

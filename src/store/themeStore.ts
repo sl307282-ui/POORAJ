@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type AccentColor = 'Sunset' | 'Ocean' | 'Rose' | 'Deep' | 'Emerald' | 'Burgundy' | 'Royal' | 'Amber' | 'Graphite' | 'Slate';
-export type Typography = 'System Default' | 'Modern';
+export type Typography = 'System Default' | 'Modern' | 'Classic' | 'Geometric' | 'Elegant';
 
 interface ThemeStoreState {
   mode: ThemeMode;

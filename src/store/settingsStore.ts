@@ -13,6 +13,10 @@ export interface SettingsState {
   setWhatsappApiUrl: (url: string) => void;
   setWhatsappApiToken: (token: string) => void;
 
+  // Company / Organization
+  companyName: string;
+  setCompanyName: (name: string) => void;
+
   // Agent Profile
   agentName: string;
   agentRole: string;
@@ -42,6 +46,10 @@ export interface SettingsState {
   // Privacy
   shareAnalytics: boolean;
   setShareAnalytics: (share: boolean) => void;
+
+  // Dashboard Mode (Personal vs Team)
+  dashboardMode: 'personal' | 'team';
+  setDashboardMode: (mode: 'personal' | 'team') => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -54,8 +62,11 @@ export const useSettingsStore = create<SettingsState>()(
       setWhatsappApiUrl: (url) => set({ whatsappApiUrl: url }),
       setWhatsappApiToken: (token) => set({ whatsappApiToken: token }),
 
+      companyName: 'ABC Properties',
+      setCompanyName: (name) => set({ companyName: name }),
+
       agentName: 'John Doe',
-      agentRole: 'Senior Sales Executive',
+      agentRole: 'Sales Executive',
       agentInitials: 'JD',
       setAgentProfile: (name, role, initials) => set({ agentName: name, agentRole: role, agentInitials: initials }),
 
@@ -78,6 +89,9 @@ export const useSettingsStore = create<SettingsState>()(
 
       shareAnalytics: true,
       setShareAnalytics: (share) => set({ shareAnalytics: share }),
+
+      dashboardMode: 'personal',
+      setDashboardMode: (mode) => set({ dashboardMode: mode }),
     }),
     {
       name: 'settings-storage',

@@ -41,3 +41,9 @@ example
 # generated native folders
 /ios
 /android
+
+# scratch / temp scripts
+/*.py
+/*.sh
+*.backup.ts
+force_agp.gradle

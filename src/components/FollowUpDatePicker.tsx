@@ -1,8 +1,9 @@
 import { useAppTheme } from '../hooks/useAppTheme';
 import { AppText } from '../components/AppText';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, Platform, ScrollView } from 'react-native';
 import { CalendarList } from 'react-native-calendars';
+import { ChevronDown, Check, Clock } from 'lucide-react-native';
 import { useThemeStore } from '../store/themeStore';
 import { Colors } from '../theme/colors';
 
@@ -11,9 +12,10 @@ interface FollowUpDatePickerProps {
   onClose: () => void;
   onSave: (dateStr: string, timeStr?: string) => void;
   initialDate?: string | null;
+  initialTime?: string | null;
 }
 
-export function FollowUpDatePicker({ visible, onClose, onSave, initialDate }: FollowUpDatePickerProps) {
+export function FollowUpDatePicker({ visible, onClose, onSave, initialDate, initialTime }: FollowUpDatePickerProps) {
   const { mode } = useThemeStore();
   const theme = useAppTheme();
 
@@ -21,10 +23,51 @@ export function FollowUpDatePicker({ visible, onClose, onSave, initialDate }: Fo
     initialDate || new Date().toISOString().split('T')[0]
   );
   
-  // Basic time selection (optional step)
-  const [selectedTime, setSelectedTime] = useState<string>('10:00 AM');
+  // Time selection (07:00 AM to 10:00 PM)
+  const [selectedTime, setSelectedTime] = useState<string>(initialTime || '10:00 AM');
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const timeOptions = ['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM'];
+  const timeListRef = useRef<ScrollView>(null);
+
+  const timeOptions = [
+    '07:00 AM', '07:30 AM',
+    '08:00 AM', '08:30 AM',
+    '09:00 AM', '09:30 AM',
+    '10:00 AM', '10:30 AM',
+    '11:00 AM', '11:30 AM',
+    '12:00 PM', '12:30 PM',
+    '01:00 PM', '01:30 PM',
+    '02:00 PM', '02:30 PM',
+    '03:00 PM', '03:30 PM',
+    '04:00 PM', '04:30 PM',
+    '05:00 PM', '05:30 PM',
+    '06:00 PM', '06:30 PM',
+    '07:00 PM', '07:30 PM',
+    '08:00 PM', '08:30 PM',
+    '09:00 PM', '09:30 PM',
+    '10:00 PM',
+  ];
+
+  useEffect(() => {
+    if (visible) {
+      if (initialDate) setSelectedDate(initialDate);
+      if (initialTime) setSelectedTime(initialTime);
+      setShowTimePicker(false);
+    }
+  }, [visible, initialDate, initialTime]);
+
+  useEffect(() => {
+    if (showTimePicker && timeListRef.current) {
+      const selectedIndex = timeOptions.indexOf(selectedTime);
+      if (selectedIndex > 0) {
+        setTimeout(() => {
+          timeListRef.current?.scrollTo({
+            y: Math.max(0, (selectedIndex - 1) * 44),
+            animated: true,
+          });
+        }, 50);
+      }
+    }
+  }, [showTimePicker]);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const tomorrow = new Date();
@@ -52,7 +95,12 @@ export function FollowUpDatePicker({ visible, onClose, onSave, initialDate }: Fo
       onRequestClose={onClose}
     >
       <Pressable style={[styles.overlay, { backgroundColor: theme.overlay }]} onPress={onClose}>
-        <Pressable style={[styles.sheet, { backgroundColor: theme.surface }]} onPress={(e) => e.stopPropagation()}>
+        <Pressable 
+          style={[styles.sheet, { backgroundColor: theme.surface }]} 
+          onPress={() => {
+            if (showTimePicker) setShowTimePicker(false);
+          }}
+        >
           <View style={[styles.dragHandle, { backgroundColor: theme.divider }]} />
           
           {/* Header */}
@@ -88,7 +136,7 @@ export function FollowUpDatePicker({ visible, onClose, onSave, initialDate }: Fo
           <View style={[styles.divider, { backgroundColor: theme.divider }]} />
 
           {/* Calendar (Smooth vertical scrolling) */}
-          <View style={{ height: 350 }}>
+          <View style={{ height: 295 }}>
             <CalendarList
               key={mode}
               horizontal={false}
@@ -135,33 +183,73 @@ export function FollowUpDatePicker({ visible, onClose, onSave, initialDate }: Fo
 
           <View style={[styles.divider, { backgroundColor: theme.divider }]} />
 
-          {/* Time Picker Toggle */}
+          {/* Time Picker Dropdown */}
           <View style={styles.timeSection}>
-            <AppText style={[styles.timeLabel, { color: theme.text }]}>Time</AppText>
+            <View style={styles.timeLabelContainer}>
+              <Clock size={18} color={theme.primaryDark} />
+              <AppText style={[styles.timeLabel, { color: theme.text }]}>Time</AppText>
+            </View>
             <TouchableOpacity 
-              style={[styles.timeSelector, { backgroundColor: theme.surfaceLight }]} 
+              style={[
+                styles.timeSelector, 
+                { 
+                  backgroundColor: theme.surfaceLight, 
+                  borderColor: showTimePicker ? theme.primaryDark : theme.divider 
+                }
+              ]} 
               onPress={() => setShowTimePicker(!showTimePicker)}
+              activeOpacity={0.7}
             >
               <AppText style={[styles.timeText, { color: theme.text }]}>{selectedTime}</AppText>
-              <AppText style={[styles.timeArrow, { color: theme.icon }]}>▼</AppText>
+              <ChevronDown 
+                size={16} 
+                color={showTimePicker ? theme.primaryDark : theme.icon} 
+                style={{ transform: [{ rotate: showTimePicker ? '180deg' : '0deg' }] }} 
+              />
             </TouchableOpacity>
           </View>
 
           {showTimePicker && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeOptionsContainer}>
-              {timeOptions.map((t, idx) => (
-                <TouchableOpacity 
-                  key={idx} 
-                  style={[styles.timeOption, { backgroundColor: theme.surfaceLight }, selectedTime === t && { backgroundColor: theme.primaryDark }]}
-                  onPress={() => {
-                    setSelectedTime(t);
-                    setShowTimePicker(false);
-                  }}
-                >
-                  <AppText style={[styles.timeOptionText, { color: theme.textSecondary }, selectedTime === t && styles.timeOptionTextActive]}>{t}</AppText>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={[styles.timeDropdownCard, { backgroundColor: theme.surface, borderColor: theme.divider }]}>
+              <ScrollView 
+                ref={timeListRef}
+                style={styles.timeDropdownScroll}
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
+              >
+                {timeOptions.map((t, idx) => {
+                  const isSelected = selectedTime === t;
+                  const isLast = idx === timeOptions.length - 1;
+                  return (
+                    <TouchableOpacity 
+                      key={idx} 
+                      style={[
+                        styles.timeDropdownOption,
+                        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider },
+                        isSelected && { backgroundColor: `${theme.primaryDark}15` }
+                      ]}
+                      onPress={() => {
+                        setSelectedTime(t);
+                        setShowTimePicker(false);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <AppText 
+                        style={[
+                          styles.timeDropdownOptionText, 
+                          { color: theme.textSecondary },
+                          isSelected && [styles.timeDropdownOptionTextSelected, { color: theme.primaryDark }]
+                        ]}
+                      >
+                        {t}
+                      </AppText>
+                      {isSelected && <Check size={16} color={theme.primaryDark} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           )}
 
           {/* Actions */}
@@ -250,10 +338,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 12,
+  },
+  timeLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   timeLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   timeSelector: {
@@ -261,31 +354,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
   },
   timeText: {
     fontSize: 15,
     fontWeight: '600',
-    marginRight: 8,
   },
-  timeArrow: {
-    fontSize: 12,
-  },
-  timeOptionsContainer: {
-    paddingHorizontal: 15,
-    paddingBottom: 15,
-  },
-  timeOption: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  timeDropdownCard: {
+    marginHorizontal: 20,
+    marginBottom: 10,
     borderRadius: 12,
-    marginHorizontal: 5,
+    borderWidth: 1,
+    maxHeight: 180,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  timeOptionText: {
-    fontWeight: '600',
+  timeDropdownScroll: {
+    maxHeight: 180,
   },
-  timeOptionTextActive: {
-    color: '#ffffff',
+  timeDropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  timeDropdownOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  timeDropdownOptionTextSelected: {
+    fontWeight: '700',
   },
   actionButtons: {
     flexDirection: 'row',

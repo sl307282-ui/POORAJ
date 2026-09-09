@@ -14,6 +14,33 @@ import { CalendarList } from 'react-native-calendars';
 import { LeadStatus } from '../../models/types';
 import { FollowUpDatePicker } from '../../components/FollowUpDatePicker';
 
+const FILTER_STATIONS = ['Jaipur', 'Ajmer', 'Bhiwadi', 'Mumbai', 'Other'];
+const FILTER_JAIPUR_LOCATIONS = [
+  'Ajmer Road', 'Sikar Road', 'Sirsi Road', 'Kalwad Road', 'Mahindra SEZ',
+  'Vatika', 'Tonk Road', 'Goner Road', 'Agra Road', 'Jagatpura', 'Chaksu',
+  'Mahla/Bagru', 'Other'
+];
+
+const FILTER_CUSTOMER_TYPES = ['Fresh Lead', 'Visited Customer', 'Existing Customer'];
+const FILTER_PROPERTY_TYPES = [
+  'Residential Plot',
+  'Commercial Plot',
+  'Industrial Plot',
+  'Farmhouse',
+  'Villa',
+  'Shop',
+  'Commercial Property',
+  'Other'
+];
+const FILTER_SIZES = ['100', '200', '300', '400', '500', '800', '1000', '1000+'];
+const FILTER_BUDGETS = ['Under 50 Lacs', '50 Lacs - 1 Cr', '1 Cr - 2 Cr', '2 Cr - 5 Cr', '5 Cr+'];
+const FILTER_REQUIREMENTS = ['Investment', 'Self Use', 'Mix', 'Rental'];
+const FILTER_ROAD_SIZES = ['30 ft', '40 ft', '50 ft', '80 ft', '100 ft', '200 ft'];
+const FILTER_FACINGS = ['East', 'West', 'North', 'South', 'Corner'];
+const FILTER_LOANS = ['No', 'Minimum', 'Max'];
+const FILTER_STATUSES = ['Fresh', 'Follow-up Today', 'Site Visit', 'Negotiation', 'Deal Closed', 'Lost'];
+const FILTER_DATE_RANGES = ['Today', 'Last 7 Days', 'Last 30 Days'];
+
 export default function SearchScreen() {
   const { mode } = useThemeStore();
   const theme = useAppTheme();
@@ -25,23 +52,45 @@ export default function SearchScreen() {
   
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [filterStations, setFilterStations] = useState<string[]>([]);
+  const [filterLocations, setFilterLocations] = useState<string[]>([]);
+  const [filterCustomerTypes, setFilterCustomerTypes] = useState<string[]>([]);
+  const [filterDateAdded, setFilterDateAdded] = useState<string | null>(null);
+  const [filterPropertyTypes, setFilterPropertyTypes] = useState<string[]>([]);
+  const [filterSizes, setFilterSizes] = useState<string[]>([]);
+  const [filterBudgets, setFilterBudgets] = useState<string[]>([]);
+  const [filterRequirements, setFilterRequirements] = useState<string[]>([]);
+  const [filterRoadSizes, setFilterRoadSizes] = useState<string[]>([]);
+  const [filterFacings, setFilterFacings] = useState<string[]>([]);
+  const [filterLoans, setFilterLoans] = useState<string[]>([]);
+
+  const handleClearAllFilters = () => {
+    setFilterStatus(null);
+    setFilterStations([]);
+    setFilterLocations([]);
+    setFilterCustomerTypes([]);
+    setFilterDateAdded(null);
+    setFilterPropertyTypes([]);
+    setFilterSizes([]);
+    setFilterBudgets([]);
+    setFilterRequirements([]);
+    setFilterRoadSizes([]);
+    setFilterFacings([]);
+    setFilterLoans([]);
+  };
+
   React.useEffect(() => {
     if (resetParam) {
       setSearchQuery('');
-      setFilterStatus(null);
-      setFilterCustomerType(null);
-      setFilterDateAdded(null);
+      handleClearAllFilters();
       setIsSelectionMode(false);
       setSelectedLeads([]);
     }
   }, [resetParam]);
   const { leads, followUps, deals, updateLeadStatus, addFollowUp, addDeal } = useLeadStore();
   const insets = useSafeAreaInsets();
-
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [filterCustomerType, setFilterCustomerType] = useState<string | null>(null);
-  const [filterDateAdded, setFilterDateAdded] = useState<string | null>(null);
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -92,16 +141,14 @@ export default function SearchScreen() {
   const [updateResult, setUpdateResult] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [nextVisit, setNextVisit] = useState('');
+  const [nextVisitTime, setNextVisitTime] = useState('10:00 AM');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateResults = [
-    'Interested',
-    'Not Interested',
-    'Call Later',
-    'No Answer',
-    'Meeting Scheduled',
-    'Deal Closed'
+    'Follow Up',
+    'Site Visit',
+    'Deal Completed'
   ];
 
   let displayedLeads = leads;
@@ -118,23 +165,29 @@ export default function SearchScreen() {
     screenTitle = 'Fresh Customers';
   } else if (filterParam === 'today') {
     displayedLeads = leads.filter(l => {
+      const isDealClosed = l.status === 'Deal Closed' || deals.some(d => d.lead_id === l.id && d.deal_status === 'Won');
+      if (isDealClosed) return false;
       const latest = getLatestFollowUp(l.id);
       return latest && latest.next_follow_up_date === today;
     });
     screenTitle = "Today's Follow-ups";
   } else if (filterParam === 'completed') {
-    const completedFollowUps = followUps.filter(f => f.created_at?.startsWith(today) || f.visit_date === today);
+    const completedFollowUps = followUps.filter(f => (f.created_at?.startsWith(today) || f.visit_date === today) && !f.is_initial && !f.comment?.startsWith('Deal Completed'));
     const completedLeadIds = completedFollowUps.map(f => f.lead_id);
     displayedLeads = leads.filter(l => completedLeadIds.includes(l.id));
     screenTitle = 'Completed Today';
   } else if (filterParam === 'upcoming') {
     displayedLeads = leads.filter(l => {
+      const isDealClosed = l.status === 'Deal Closed' || deals.some(d => d.lead_id === l.id && d.deal_status === 'Won');
+      if (isDealClosed) return false;
       const latest = getLatestFollowUp(l.id);
       return latest && latest.next_follow_up_date && latest.next_follow_up_date > today;
     });
     screenTitle = "Upcoming Follow-ups";
   } else if (filterParam === 'pending') {
     displayedLeads = leads.filter(l => {
+      const isDealClosed = l.status === 'Deal Closed' || deals.some(d => d.lead_id === l.id && d.deal_status === 'Won');
+      if (isDealClosed) return false;
       const latest = getLatestFollowUp(l.id);
       return latest && latest.next_follow_up_date && latest.next_follow_up_date < today;
     });
@@ -149,12 +202,22 @@ export default function SearchScreen() {
       return aDate - bDate;
     });
   } else if (filterParam === 'closed') {
-    const closedDealLeadIds = deals.filter(d => d.deal_status === 'Won').map(d => d.lead_id);
-    displayedLeads = leads.filter(l => closedDealLeadIds.includes(l.id));
-    screenTitle = 'Closed Deals';
+    displayedLeads = leads.filter(l => l.status === 'Deal Closed' || deals.some(d => d.lead_id === l.id && d.deal_status === 'Won'));
+    screenTitle = 'Deals Completed';
   } else if (filterParam === 'total') {
     screenTitle = 'Total Leads';
   }
+
+  const parseBudgetToLacs = (budgetStr?: string): number | null => {
+    if (!budgetStr) return null;
+    const cleaned = budgetStr.trim().toLowerCase();
+    const num = parseFloat(cleaned.replace(/[^0-9.]/g, ''));
+    if (isNaN(num)) return null;
+    if (cleaned.includes('cr')) {
+      return num * 100;
+    }
+    return num;
+  };
 
   if (searchQuery.trim() !== '') {
     const query = searchQuery.toLowerCase();
@@ -163,16 +226,103 @@ export default function SearchScreen() {
       l.mobile.includes(query) ||
       (l.district && l.district.toLowerCase().includes(query)) ||
       (l.state && l.state.toLowerCase().includes(query)) ||
-      (l.location && l.location.toLowerCase().includes(query)) ||
-      (l.status && l.status.toLowerCase().includes(query))
+      (l.location && l.location!.toLowerCase().includes(query)) ||
+      (l.station && l.station!.toLowerCase().includes(query)) ||
+      (l.status && l.status.toLowerCase().includes(query)) ||
+      (l.property_type && l.property_type.toLowerCase().includes(query)) ||
+      (l.requirement && l.requirement.toLowerCase().includes(query)) ||
+      (l.budget && l.budget.toLowerCase().includes(query)) ||
+      (l.road_size && (Array.isArray(l.road_size) ? l.road_size.join(' ') : l.road_size).toLowerCase().includes(query)) ||
+      (l.facing && (Array.isArray(l.facing) ? l.facing.join(' ') : l.facing).toLowerCase().includes(query))
     );
   }
 
   if (filterStatus) {
     displayedLeads = displayedLeads.filter(l => l.status === filterStatus);
   }
-  if (filterCustomerType) {
-    displayedLeads = displayedLeads.filter(l => l.customer_type === filterCustomerType);
+  if (filterStations.length > 0) {
+    displayedLeads = displayedLeads.filter(l => 
+      l.station && filterStations.some(st => st.toLowerCase() === l.station!.toLowerCase())
+    );
+  }
+  if (filterLocations.length > 0) {
+    displayedLeads = displayedLeads.filter(l => 
+      l.location && filterLocations.some(loc => loc.toLowerCase() === l.location!.toLowerCase())
+    );
+  }
+  if (filterCustomerTypes.length > 0) {
+    displayedLeads = displayedLeads.filter(l => 
+      l.customer_type && filterCustomerTypes.some(ct => ct.toLowerCase() === l.customer_type.toLowerCase())
+    );
+  }
+  if (filterPropertyTypes.length > 0) {
+    displayedLeads = displayedLeads.filter(l => {
+      if (!l.property_type) return false;
+      return filterPropertyTypes.some(pt => {
+        if (pt === 'Other') {
+          const standard = ['Residential Plot', 'Commercial Plot', 'Industrial Plot', 'Farmhouse', 'Villa', 'Shop', 'Commercial Property'];
+          return !standard.includes(l.property_type) || l.property_type.toLowerCase() === 'other';
+        }
+        return l.property_type.toLowerCase() === pt.toLowerCase();
+      });
+    });
+  }
+  if (filterSizes.length > 0) {
+    displayedLeads = displayedLeads.filter(l => {
+      if (!l.size) return false;
+      const num = parseFloat(l.size.replace(/[^0-9.]/g, ''));
+      return filterSizes.some(sz => {
+        if (sz === '1000+') return num >= 1000;
+        const szNum = parseFloat(sz);
+        return num === szNum || l.size.toLowerCase().includes(sz.toLowerCase());
+      });
+    });
+  }
+  if (filterBudgets.length > 0) {
+    displayedLeads = displayedLeads.filter(l => {
+      const lacs = parseBudgetToLacs(l.budget);
+      if (lacs === null) return false;
+      return filterBudgets.some(b => {
+        if (b === 'Under 50 Lacs') return lacs < 50;
+        if (b === '50 Lacs - 1 Cr') return lacs >= 50 && lacs <= 100;
+        if (b === '1 Cr - 2 Cr') return lacs >= 100 && lacs <= 200;
+        if (b === '2 Cr - 5 Cr') return lacs >= 200 && lacs <= 500;
+        if (b === '5 Cr+') return lacs >= 500;
+        return false;
+      });
+    });
+  }
+  if (filterRequirements.length > 0) {
+    displayedLeads = displayedLeads.filter(l => 
+      l.requirement && filterRequirements.some(req => req.toLowerCase() === l.requirement.toLowerCase())
+    );
+  }
+  if (filterRoadSizes.length > 0) {
+    displayedLeads = displayedLeads.filter(l => {
+      if (!l.road_size) return false;
+      const roadSizes = Array.isArray(l.road_size) 
+        ? l.road_size 
+        : l.road_size.split(',').map(s => s.trim());
+      return filterRoadSizes.some(fr => 
+        roadSizes.some(r => r.replace(/\s+/g, '').toLowerCase() === fr.replace(/\s+/g, '').toLowerCase())
+      );
+    });
+  }
+  if (filterFacings.length > 0) {
+    displayedLeads = displayedLeads.filter(l => {
+      if (!l.facing) return false;
+      const facings = Array.isArray(l.facing) 
+        ? l.facing 
+        : l.facing.split(',').map(s => s.trim());
+      return filterFacings.some(ff => 
+        facings.some(f => f.toLowerCase() === ff.toLowerCase())
+      );
+    });
+  }
+  if (filterLoans.length > 0) {
+    displayedLeads = displayedLeads.filter(l => 
+      l.loan_requirement && filterLoans.some(loan => loan.toLowerCase() === l.loan_requirement.toLowerCase())
+    );
   }
   if (filterDateAdded) {
     const now = new Date();
@@ -194,17 +344,14 @@ export default function SearchScreen() {
   }
 
   const handleUpdateSave = async () => {
-    const canSave = updateResult || notes.trim() || nextVisit;
+    const canSave = !!updateResult; // Compulsory
     if (!selectedLeadId || !canSave) return;
     setIsSubmitting(true);
     
     let finalNextVisit = nextVisit.trim() ? nextVisit.trim() : null;
     let newStatus: LeadStatus | undefined;
 
-    if (updateResult === 'Not Interested') {
-      finalNextVisit = null;
-      newStatus = 'Lost';
-    } else if (updateResult === 'Deal Closed') {
+    if (updateResult === 'Deal Completed') {
       finalNextVisit = null;
       newStatus = 'Deal Closed';
       const lead = leads.find(l => l.id === selectedLeadId);
@@ -218,9 +365,9 @@ export default function SearchScreen() {
           final_amount: parseInt((lead.budget || '').replace(/[^0-9]/g, ''), 10) || 0
         });
       }
-    } else if (updateResult === 'Meeting Scheduled') {
+    } else if (updateResult === 'Site Visit') {
       newStatus = 'Site Visit';
-    } else if (updateResult === 'Interested') {
+    } else if (updateResult === 'Follow Up') {
       newStatus = 'Negotiation';
     }
 
@@ -232,15 +379,19 @@ export default function SearchScreen() {
     if (updateResult) {
       finalComment = `${updateResult}${finalComment ? ' - ' + finalComment : ''}`;
     }
+    if (finalNextVisit && nextVisitTime && !finalComment.includes('Time:')) {
+      finalComment = `${finalComment ? finalComment + ' ' : ''}(Time: ${nextVisitTime})`;
+    }
     if (!finalComment) finalComment = 'Follow-up logged';
 
+    const shouldSkipMark = updateResult === 'Deal Completed' || updateResult === 'Site Visit';
     await addFollowUp({
       lead_id: selectedLeadId,
       comment: finalComment,
       visit_date: new Date().toISOString().split('T')[0],
       next_follow_up_date: finalNextVisit,
       reminder_sent: false,
-    });
+    }, false, shouldSkipMark);
 
     setShowUpdateModal(false);
     setIsSubmitting(false);
@@ -248,6 +399,7 @@ export default function SearchScreen() {
     setUpdateResult(null);
     setNotes('');
     setNextVisit('');
+    setNextVisitTime('10:00 AM');
   };
 
   return (
@@ -282,34 +434,125 @@ export default function SearchScreen() {
         >
           {isSelectionMode ? <X size={20} color={theme.primaryDark} /> : <CheckSquare size={20} color={theme.primaryDark} />}
         </TouchableOpacity>
-        <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilterModal(true)}>
-          <Filter size={20} color={theme.primaryDark} />
+        <TouchableOpacity 
+          style={[
+            styles.filterBtn, 
+            Boolean(
+              filterStatus ||
+              filterStations.length > 0 ||
+              filterLocations.length > 0 ||
+              filterCustomerTypes.length > 0 ||
+              filterDateAdded ||
+              filterPropertyTypes.length > 0 ||
+              filterSizes.length > 0 ||
+              filterBudgets.length > 0 ||
+              filterRequirements.length > 0 ||
+              filterFacings.length > 0 ||
+              filterLoans.length > 0
+            ) && { 
+              backgroundColor: theme.isDark ? 'rgba(14,165,233,0.2)' : 'rgba(2,132,199,0.1)', 
+              borderColor: theme.primaryDark 
+            }
+          ]}
+          onPress={() => setShowFilterModal(true)}
+        >
+          <Filter size={20} color={theme.primaryDark} strokeWidth={2} />
         </TouchableOpacity>
       </View>
 
       {/* Active Filters */}
-      {(filterStatus || filterCustomerType || filterDateAdded) && (
+      {(
+        filterStatus ||
+        filterStations.length > 0 ||
+        filterLocations.length > 0 ||
+        filterCustomerTypes.length > 0 ||
+        filterDateAdded ||
+        filterPropertyTypes.length > 0 ||
+        filterSizes.length > 0 ||
+        filterBudgets.length > 0 ||
+        filterRequirements.length > 0 ||
+        filterFacings.length > 0 ||
+        filterLoans.length > 0
+      ) && (
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false} 
           style={styles.activeFiltersContainer}
           contentContainerStyle={styles.activeFiltersContent}
         >
+          <TouchableOpacity style={styles.clearFiltersBtn} onPress={handleClearAllFilters}>
+            <AppText style={styles.clearFiltersText}>Clear</AppText>
+          </TouchableOpacity>
+          
           {filterStatus && (
             <TouchableOpacity style={styles.activeFilterChip} onPress={() => setFilterStatus(null)}>
-              <AppText style={styles.activeFilterText}>{filterStatus}</AppText>
+              <AppText style={styles.activeFilterText}>Status: {filterStatus}</AppText>
               <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           )}
-          {filterCustomerType && (
-            <TouchableOpacity style={styles.activeFilterChip} onPress={() => setFilterCustomerType(null)}>
-              <AppText style={styles.activeFilterText}>{filterCustomerType}</AppText>
+          {filterStations.map(station => (
+            <TouchableOpacity key={station} style={styles.activeFilterChip} onPress={() => setFilterStations(prev => prev.filter(t => t !== station))}>
+              <AppText style={styles.activeFilterText}>Station: {station}</AppText>
               <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
-          )}
+          ))}
+          {filterLocations.map(loc => (
+            <TouchableOpacity key={loc} style={styles.activeFilterChip} onPress={() => setFilterLocations(prev => prev.filter(t => t !== loc))}>
+              <AppText style={styles.activeFilterText}>Location: {loc}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          ))}
+          {filterCustomerTypes.map(type => (
+            <TouchableOpacity key={type} style={styles.activeFilterChip} onPress={() => setFilterCustomerTypes(prev => prev.filter(t => t !== type))}>
+              <AppText style={styles.activeFilterText}>Type: {type}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          ))}
+          {filterPropertyTypes.map(pt => (
+            <TouchableOpacity key={pt} style={styles.activeFilterChip} onPress={() => setFilterPropertyTypes(prev => prev.filter(t => t !== pt))}>
+              <AppText style={styles.activeFilterText}>Prop: {pt}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          ))}
+          {filterSizes.map(sz => (
+            <TouchableOpacity key={sz} style={styles.activeFilterChip} onPress={() => setFilterSizes(prev => prev.filter(s => s !== sz))}>
+              <AppText style={styles.activeFilterText}>Size: {sz} sq yd</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          ))}
+          {filterBudgets.map(b => (
+            <TouchableOpacity key={b} style={styles.activeFilterChip} onPress={() => setFilterBudgets(prev => prev.filter(x => x !== b))}>
+              <AppText style={styles.activeFilterText}>Budget: {b}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          ))}
+          {filterRequirements.map(req => (
+            <TouchableOpacity key={req} style={styles.activeFilterChip} onPress={() => setFilterRequirements(prev => prev.filter(r => r !== req))}>
+              <AppText style={styles.activeFilterText}>Req: {req}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          ))}
+          {filterRoadSizes.map(size => (
+            <TouchableOpacity key={size} style={styles.activeFilterChip} onPress={() => setFilterRoadSizes(prev => prev.filter(s => s !== size))}>
+              <AppText style={styles.activeFilterText}>Road: {size}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          ))}
+          {filterFacings.map(facing => (
+            <TouchableOpacity key={facing} style={styles.activeFilterChip} onPress={() => setFilterFacings(prev => prev.filter(f => f !== facing))}>
+              <AppText style={styles.activeFilterText}>Facing: {facing}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          ))}
+          {filterLoans.map(loan => (
+            <TouchableOpacity key={loan} style={styles.activeFilterChip} onPress={() => setFilterLoans(prev => prev.filter(l => l !== loan))}>
+              <AppText style={styles.activeFilterText}>Loan: {loan}</AppText>
+              <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          ))}
           {filterDateAdded && (
             <TouchableOpacity style={styles.activeFilterChip} onPress={() => setFilterDateAdded(null)}>
-              <AppText style={styles.activeFilterText}>{filterDateAdded}</AppText>
+              <AppText style={styles.activeFilterText}>Date: {filterDateAdded}</AppText>
               <X size={14} color={theme.primaryDark} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           )}
@@ -327,9 +570,197 @@ export default function SearchScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterScrollContent}>
+              <AppText style={styles.filterSectionTitle}>Customer Type</AppText>
+              <View style={styles.filterChipsRow}>
+                {FILTER_CUSTOMER_TYPES.map(type => {
+                  const isSelected = filterCustomerTypes.includes(type);
+                  return (
+                    <TouchableOpacity 
+                      key={type} 
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                      onPress={() => setFilterCustomerTypes(prev => 
+                        prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+                      )}
+                    >
+                      <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{type}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <AppText style={styles.filterSectionTitle}>Station</AppText>
+              <View style={styles.filterChipsRow}>
+                {FILTER_STATIONS.map(station => {
+                  const isSelected = filterStations.includes(station);
+                  return (
+                    <TouchableOpacity 
+                      key={station} 
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                      onPress={() => setFilterStations(prev => {
+                        const newStations = prev.includes(station) ? prev.filter(s => s !== station) : [...prev, station];
+                        if (station === 'Jaipur' && isSelected) {
+                           setFilterLocations(prevLoc => prevLoc.filter(l => !FILTER_JAIPUR_LOCATIONS.includes(l)));
+                        }
+                        return newStations;
+                      })}
+                    >
+                      <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{station}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {filterStations.includes('Jaipur') && (
+                <>
+                  <AppText style={styles.filterSectionTitle}>Location (Jaipur)</AppText>
+                  <View style={styles.filterChipsRow}>
+                    {FILTER_JAIPUR_LOCATIONS.map(loc => {
+                      const isSelected = filterLocations.includes(loc);
+                      return (
+                        <TouchableOpacity 
+                          key={loc} 
+                          style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                          onPress={() => setFilterLocations(prev => 
+                            prev.includes(loc) ? prev.filter(l => l !== loc) : [...prev, loc]
+                          )}
+                        >
+                          <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{loc}</AppText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              <AppText style={styles.filterSectionTitle}>Property Type</AppText>
+              <View style={styles.filterChipsRow}>
+                {FILTER_PROPERTY_TYPES.map(pt => {
+                  const isSelected = filterPropertyTypes.includes(pt);
+                  return (
+                    <TouchableOpacity 
+                      key={pt} 
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                      onPress={() => setFilterPropertyTypes(prev => 
+                        prev.includes(pt) ? prev.filter(t => t !== pt) : [...prev, pt]
+                      )}
+                    >
+                      <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{pt}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <AppText style={styles.filterSectionTitle}>Plot Size (sq yd)</AppText>
+              <View style={styles.filterChipsRow}>
+                {FILTER_SIZES.map(sz => {
+                  const isSelected = filterSizes.includes(sz);
+                  return (
+                    <TouchableOpacity 
+                      key={sz} 
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                      onPress={() => setFilterSizes(prev => 
+                        prev.includes(sz) ? prev.filter(s => s !== sz) : [...prev, sz]
+                      )}
+                    >
+                      <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{sz} sq yd</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <AppText style={styles.filterSectionTitle}>Budget</AppText>
+              <View style={styles.filterChipsRow}>
+                {FILTER_BUDGETS.map(b => {
+                  const isSelected = filterBudgets.includes(b);
+                  return (
+                    <TouchableOpacity 
+                      key={b} 
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                      onPress={() => setFilterBudgets(prev => 
+                        prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]
+                      )}
+                    >
+                      <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{b}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <AppText style={styles.filterSectionTitle}>Requirement</AppText>
+              <View style={styles.filterChipsRow}>
+                {FILTER_REQUIREMENTS.map(req => {
+                  const isSelected = filterRequirements.includes(req);
+                  return (
+                    <TouchableOpacity 
+                      key={req} 
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                      onPress={() => setFilterRequirements(prev => 
+                        prev.includes(req) ? prev.filter(r => r !== req) : [...prev, req]
+                      )}
+                    >
+                      <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{req}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <AppText style={styles.filterSectionTitle}>Road Size</AppText>
+              <View style={styles.filterChipsRow}>
+                {FILTER_ROAD_SIZES.map(size => {
+                  const isSelected = filterRoadSizes.includes(size);
+                  return (
+                    <TouchableOpacity 
+                      key={size} 
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                      onPress={() => setFilterRoadSizes(prev => 
+                        prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+                      )}
+                    >
+                      <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{size}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <AppText style={styles.filterSectionTitle}>Bank Loan</AppText>
+              <View style={styles.filterChipsRow}>
+                {FILTER_LOANS.map(loan => {
+                  const isSelected = filterLoans.includes(loan);
+                  return (
+                    <TouchableOpacity 
+                      key={loan} 
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                      onPress={() => setFilterLoans(prev => 
+                        prev.includes(loan) ? prev.filter(l => l !== loan) : [...prev, loan]
+                      )}
+                    >
+                      <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{loan}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <AppText style={styles.filterSectionTitle}>Property Facing</AppText>
+              <View style={styles.filterChipsRow}>
+                {FILTER_FACINGS.map(facing => {
+                  const isSelected = filterFacings.includes(facing);
+                  return (
+                    <TouchableOpacity 
+                      key={facing} 
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                      onPress={() => setFilterFacings(prev => 
+                        prev.includes(facing) ? prev.filter(f => f !== facing) : [...prev, facing]
+                      )}
+                    >
+                      <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{facing}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               <AppText style={styles.filterSectionTitle}>Status</AppText>
               <View style={styles.filterChipsRow}>
-                {['Fresh', 'Follow-up Today', 'Site Visit', 'Negotiation', 'Deal Closed', 'Lost'].map(status => (
+                {FILTER_STATUSES.map(status => (
                   <TouchableOpacity 
                     key={status} 
                     style={[styles.filterChip, filterStatus === status && styles.filterChipSelected]}
@@ -340,22 +771,9 @@ export default function SearchScreen() {
                 ))}
               </View>
 
-              <AppText style={styles.filterSectionTitle}>Customer Type</AppText>
-              <View style={styles.filterChipsRow}>
-                {['Fresh Lead', 'Visited Customer', 'Existing Customer'].map(type => (
-                  <TouchableOpacity 
-                    key={type} 
-                    style={[styles.filterChip, filterCustomerType === type && styles.filterChipSelected]}
-                    onPress={() => setFilterCustomerType(filterCustomerType === type ? null : type)}
-                  >
-                    <AppText style={[styles.filterChipText, filterCustomerType === type && styles.filterChipTextSelected]}>{type}</AppText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
               <AppText style={styles.filterSectionTitle}>Date Added</AppText>
               <View style={styles.filterChipsRow}>
-                {['Today', 'Last 7 Days', 'Last 30 Days'].map(range => (
+                {FILTER_DATE_RANGES.map(range => (
                   <TouchableOpacity 
                     key={range} 
                     style={[styles.filterChip, filterDateAdded === range && styles.filterChipSelected]}
@@ -370,11 +788,7 @@ export default function SearchScreen() {
             <View style={styles.filterModalFooter}>
               <TouchableOpacity 
                 style={styles.clearFiltersBtn}
-                onPress={() => {
-                  setFilterStatus(null);
-                  setFilterCustomerType(null);
-                  setFilterDateAdded(null);
-                }}
+                onPress={handleClearAllFilters}
               >
                 <AppText style={styles.clearFiltersText}>Clear</AppText>
               </TouchableOpacity>
@@ -452,6 +866,11 @@ export default function SearchScreen() {
                   dueText = `In ${Math.abs(diffDays)} days`;
                 } else {
                   dueText = new Date(latest.next_follow_up_date).toLocaleDateString();
+                }
+
+                const timeMatch = latest.comment?.match(/\(Time:\s*([0-9]{1,2}:[0-9]{2}\s*(?:AM|PM))\)/i);
+                if (timeMatch && timeMatch[1]) {
+                  dueText += ` at ${timeMatch[1]}`;
                 }
               }
 
@@ -585,16 +1004,22 @@ export default function SearchScreen() {
                     <AppText style={styles.leadName}>{lead.name}</AppText>
                     <AppText style={styles.leadMobile}>{lead.mobile}</AppText>
                   </View>
-                  <View style={[
-                    styles.statusBadge,
-                    lead.status === 'Deal Closed' && { backgroundColor: theme.surfaceLight },
-                    lead.status === 'Lost' && { backgroundColor: '#f3f4f6' }
-                  ]}>
-                    <AppText style={[
-                      styles.statusText,
-                      lead.status === 'Deal Closed' && { color: '#dc2626' },
-                      lead.status === 'Lost' && { color: '#4b5563' }
-                    ]}>{lead.status}</AppText>
+                  <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <View style={styles.statusBadge}>
+                      <AppText style={styles.statusText}>{lead.customer_type || 'Fresh Lead'}</AppText>
+                    </View>
+                    
+                    {(lead.status === 'Deal Closed' || deals.some(d => d.lead_id === lead.id && d.deal_status === 'Won')) && (
+                      <View style={[styles.statusBadge, { backgroundColor: theme.surfaceLight }]}>
+                        <AppText style={[styles.statusText, { color: '#dc2626' }]}>Deal Closed</AppText>
+                      </View>
+                    )}
+
+                    {lead.status === 'Lost' && (
+                      <View style={[styles.statusBadge, { backgroundColor: '#f3f4f6' }]}>
+                        <AppText style={[styles.statusText, { color: '#4b5563' }]}>Lost</AppText>
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
               </View>
@@ -781,10 +1206,10 @@ export default function SearchScreen() {
             style={[{ flex: 1, backgroundColor: theme.surface }]} 
             behavior={undefined}
           >
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 44 : 20) + 12, paddingBottom: 16 }]}>
               <AppText style={styles.modalTitle}>Follow-up Result</AppText>
-              <TouchableOpacity onPress={() => setShowUpdateModal(false)}>
-                <X size={24} color="#0f172a" />
+              <TouchableOpacity onPress={() => setShowUpdateModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <X size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
             
@@ -815,13 +1240,17 @@ export default function SearchScreen() {
               <AppText style={styles.inputLabel}>Next Follow-up Date</AppText>
               <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
                 <CalendarIcon size={20} color="#64748b" />
-                <AppText style={styles.dateSelectorText}>{nextVisit || 'Select Date & Time'}</AppText>
+                <AppText style={styles.dateSelectorText}>
+                  {nextVisit 
+                    ? `📅 ${new Date(nextVisit).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}${nextVisitTime ? `  🕒 ${nextVisitTime}` : ''}` 
+                    : 'Select Date & Time'}
+                </AppText>
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={[styles.saveButton, !(updateResult || notes.trim() || nextVisit) && styles.saveButtonDisabled]} 
+                style={[styles.saveButton, !updateResult && styles.saveButtonDisabled]} 
                 onPress={handleUpdateSave}
-                disabled={!(updateResult || notes.trim() || nextVisit) || isSubmitting}
+                disabled={!updateResult || isSubmitting}
               >
                 {isSubmitting ? (
                   <ActivityIndicator color="#ffffff" />
@@ -833,10 +1262,11 @@ export default function SearchScreen() {
             <FollowUpDatePicker
               visible={showDatePicker}
               initialDate={nextVisit}
+              initialTime={nextVisitTime}
               onClose={() => setShowDatePicker(false)}
               onSave={(date, time) => {
                 setNextVisit(date);
-                // Currently ignoring time string for DB storage, but it updates the UI
+                if (time) setNextVisitTime(time);
                 setShowDatePicker(false);
               }}
             />

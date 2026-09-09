@@ -7,8 +7,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Keyboa
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Phone, MessageCircle, Send, Plus, Pencil, Trash, X, Calendar as CalendarIcon, Check, MoreVertical } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLeadStore } from '../../store/leadStore';
+import { LeadStatus } from '../../models/types';
 import { callNumber, openWhatsApp } from '../../utils/deepLinks';
 import { CalendarList } from 'react-native-calendars';
 import { FollowUpDatePicker } from '../../components/FollowUpDatePicker';
@@ -31,6 +31,7 @@ export default function LeadDetailScreen() {
   
   const [comment, setComment] = useState('');
   const [nextVisit, setNextVisit] = useState('');
+  const [nextVisitTime, setNextVisitTime] = useState('10:00 AM');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showAddFollowUpModal, setShowAddFollowUpModal] = useState(false);
@@ -39,12 +40,9 @@ export default function LeadDetailScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateResults = [
-    'Interested',
-    'Not Interested',
-    'Call Later',
-    'No Answer',
-    'Meeting Scheduled',
-    'Deal Closed'
+    'Follow Up',
+    'Site Visit',
+    'Deal Completed'
   ];
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [showContactMenu, setShowContactMenu] = useState(false);
@@ -53,17 +51,14 @@ export default function LeadDetailScreen() {
   const leadFollowUps = followUps.filter(f => f.lead_id === id);
 
   const handleAddFollowUp = async () => {
-    const canSave = updateResult || comment.trim() || nextVisit;
+    const canSave = !!updateResult; // Compulsory to select one
     if (!canSave) return;
     setIsSubmitting(true);
     
     let finalNextVisit = nextVisit.trim() ? nextVisit.trim() : null;
     let newStatus: string | undefined;
 
-    if (updateResult === 'Not Interested') {
-      finalNextVisit = null;
-      newStatus = 'Lost';
-    } else if (updateResult === 'Deal Closed') {
+    if (updateResult === 'Deal Completed') {
       finalNextVisit = null;
       newStatus = 'Deal Closed';
       if (lead) {
@@ -76,23 +71,22 @@ export default function LeadDetailScreen() {
           final_amount: parseInt((lead.budget || '').replace(/[^0-9]/g, ''), 10) || 0
         });
       }
-    } else if (updateResult === 'Meeting Scheduled') {
+    } else if (updateResult === 'Site Visit') {
       newStatus = 'Site Visit';
-    } else if (updateResult === 'Interested') {
+    } else if (updateResult === 'Follow Up') {
       newStatus = 'Negotiation';
     }
 
     if (newStatus && lead) {
-      await updateLeadStatus(lead.id, newStatus);
-    }
-
-    if (lead) {
-      await updateLead(lead.id, { next_follow_up_date: finalNextVisit || undefined });
+      await updateLeadStatus(lead.id, newStatus as LeadStatus);
     }
 
     let finalComment = comment.trim();
     if (updateResult) {
       finalComment = `${updateResult}${finalComment ? ' - ' + finalComment : ''}`;
+    }
+    if (finalNextVisit && nextVisitTime && !finalComment.includes('Time:')) {
+      finalComment = `${finalComment ? finalComment + ' ' : ''}(Time: ${nextVisitTime})`;
     }
     if (!finalComment) finalComment = 'Follow-up logged';
 
@@ -102,17 +96,19 @@ export default function LeadDetailScreen() {
         next_follow_up_date: finalNextVisit,
       });
     } else {
+      const shouldSkipMark = updateResult === 'Deal Completed' || updateResult === 'Site Visit';
       await addFollowUp({
         lead_id: id as string,
         comment: finalComment,
         visit_date: new Date().toISOString().split('T')[0],
         next_follow_up_date: finalNextVisit,
         reminder_sent: false,
-      });
+      }, false, shouldSkipMark);
     }
 
     setComment('');
     setNextVisit('');
+    setNextVisitTime('10:00 AM');
     setUpdateResult(null);
     setEditingFollowUpId(null);
     setShowAddFollowUpModal(false);
@@ -122,6 +118,10 @@ export default function LeadDetailScreen() {
   const handleEditFollowUp = (followUp: any) => {
     setComment(followUp.comment);
     setNextVisit(followUp.next_follow_up_date || '');
+    const timeMatch = followUp.comment?.match(/\(Time:\s*([0-9]{1,2}:[0-9]{2}\s*(?:AM|PM))\)/i);
+    if (timeMatch && timeMatch[1]) {
+      setNextVisitTime(timeMatch[1]);
+    }
     setEditingFollowUpId(followUp.id);
     setShowAddFollowUpModal(true);
   };
@@ -225,6 +225,33 @@ export default function LeadDetailScreen() {
             <AppText style={styles.infoLabel}>Customer Type</AppText>
             <AppText style={styles.infoValue}>{lead.customer_type || 'N/A'}</AppText>
           </View>
+          {lead.source ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <AppText style={styles.infoLabel}>Lead Source</AppText>
+                <AppText style={styles.infoValue}>{lead.source}</AppText>
+              </View>
+            </>
+          ) : null}
+          {lead.visited_location ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <AppText style={styles.infoLabel}>📍 Location</AppText>
+                <AppText style={styles.infoValue}>{lead.visited_location}</AppText>
+              </View>
+            </>
+          ) : null}
+          {lead.property_name ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <AppText style={styles.infoLabel}>🏠 Property Name</AppText>
+                <AppText style={styles.infoValue}>{lead.property_name}</AppText>
+              </View>
+            </>
+          ) : null}
           <View style={styles.divider} />
           
           <View style={styles.infoRow}>
@@ -279,16 +306,26 @@ export default function LeadDetailScreen() {
               
               <View style={styles.infoRow}>
                 <AppText style={styles.infoLabel}>Road Size</AppText>
-                <AppText style={styles.infoValue}>{lead.road_size || 'N/A'}</AppText>
+                <AppText style={styles.infoValue}>{Array.isArray(lead.road_size) ? lead.road_size.join(', ') : (lead.road_size || 'N/A')}</AppText>
               </View>
               <View style={styles.divider} />
               
               <View style={styles.infoRow}>
-                <AppText style={styles.infoLabel}>Facing</AppText>
-                <AppText style={styles.infoValue}>{lead.facing || 'N/A'}</AppText>
+                <AppText style={styles.infoLabel}>Property Facing</AppText>
+                <AppText style={styles.infoValue}>{Array.isArray(lead.facing) ? lead.facing.join(', ') : (lead.facing || 'N/A')}</AppText>
               </View>
               <View style={styles.divider} />
               
+              {Boolean(lead.station) && (
+                <>
+                  <View style={styles.infoRow}>
+                    <AppText style={styles.infoLabel}>Station</AppText>
+                    <AppText style={styles.infoValue}>{lead.station}</AppText>
+                  </View>
+                  <View style={styles.divider} />
+                </>
+              )}
+
               <View style={styles.infoRow}>
                 <AppText style={styles.infoLabel}>Location</AppText>
                 <AppText style={styles.infoValue}>{lead.location || 'N/A'}</AppText>
@@ -498,10 +535,10 @@ export default function LeadDetailScreen() {
             style={[{ flex: 1, backgroundColor: theme.surface }]} 
             behavior={undefined}
           >
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 44 : 20) + 12, paddingBottom: 16 }]}>
               <AppText style={styles.modalTitle}>{editingFollowUpId ? 'Edit Follow-up Result' : 'Follow-up Result'}</AppText>
-              <TouchableOpacity onPress={() => setShowAddFollowUpModal(false)}>
-                <X size={24} color="#0f172a" />
+              <TouchableOpacity onPress={() => setShowAddFollowUpModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <X size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
             
@@ -532,13 +569,17 @@ export default function LeadDetailScreen() {
               <AppText style={styles.inputLabel}>Next Follow-up Date</AppText>
               <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
                 <CalendarIcon size={20} color="#64748b" />
-                <AppText style={styles.dateSelectorText}>{nextVisit || 'Select Date & Time'}</AppText>
+                <AppText style={styles.dateSelectorText}>
+                  {nextVisit 
+                    ? `📅 ${new Date(nextVisit).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}${nextVisitTime ? `  🕒 ${nextVisitTime}` : ''}` 
+                    : 'Select Date & Time'}
+                </AppText>
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={[styles.saveButton, !(updateResult || comment.trim() || nextVisit) && styles.saveButtonDisabled]} 
+                style={[styles.saveButton, !updateResult && styles.saveButtonDisabled]} 
                 onPress={handleAddFollowUp}
-                disabled={!(updateResult || comment.trim() || nextVisit) || isSubmitting}
+                disabled={!updateResult || isSubmitting}
               >
                 {isSubmitting ? (
                   <ActivityIndicator color="#ffffff" />
@@ -550,9 +591,11 @@ export default function LeadDetailScreen() {
             <FollowUpDatePicker
               visible={showDatePicker}
               initialDate={nextVisit}
+              initialTime={nextVisitTime}
               onClose={() => setShowDatePicker(false)}
               onSave={(date, time) => {
                 setNextVisit(date);
+                if (time) setNextVisitTime(time);
                 setShowDatePicker(false);
               }}
             />

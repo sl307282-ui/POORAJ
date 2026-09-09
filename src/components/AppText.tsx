@@ -21,20 +21,16 @@ export function AppText(props: TextProps) {
   
   // Try to determine if this is a heading based on standard styles
   const flattenStyle = StyleSheet.flatten(props.style || {});
-  const isHeading = flattenStyle.fontSize && flattenStyle.fontSize >= 18 || flattenStyle.fontWeight === 'bold' || flattenStyle.fontWeight >= '600';
+  const isHeading = (flattenStyle.fontSize && flattenStyle.fontSize >= 18) || flattenStyle.fontWeight === 'bold' || (flattenStyle.fontWeight && flattenStyle.fontWeight >= '600');
   const weight = flattenStyle.fontWeight || '400';
 
   let fontFamily = undefined;
 
   if (typography !== 'System Default') {
-    // We optimized fonts for Android. Only Modern theme uses custom downloaded fonts.
-    // Classic, Geometric, and Elegant fallback to system defaults or the modern fonts to save memory.
-    if (typography === 'Modern' || typography !== 'System Default') {
-      if (isHeading) {
-        fontFamily = weight >= '700' ? 'Outfit_700Bold' : weight >= '600' ? 'Outfit_600SemiBold' : weight >= '500' ? 'Outfit_500Medium' : 'Outfit_400Regular';
-      } else {
-        fontFamily = weight >= '700' ? 'Inter_700Bold' : weight >= '600' ? 'Inter_600SemiBold' : weight >= '500' ? 'Inter_500Medium' : 'Inter_400Regular';
-      }
+    if (isHeading) {
+      fontFamily = weight >= '700' ? 'Outfit_700Bold' : weight >= '600' ? 'Outfit_600SemiBold' : weight >= '500' ? 'Outfit_500Medium' : 'Outfit_400Regular';
+    } else {
+      fontFamily = weight >= '700' ? 'Inter_700Bold' : weight >= '600' ? 'Inter_600SemiBold' : weight >= '500' ? 'Inter_500Medium' : 'Inter_400Regular';
     }
   }
 

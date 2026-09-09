@@ -2,6 +2,8 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
+import { FOLLOW_UP_CHANNEL_ID } from './followUpReminders';
+
 export async function registerForPushNotificationsAsync(): Promise<boolean> {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -9,6 +11,16 @@ export async function registerForPushNotificationsAsync(): Promise<boolean> {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#0ea5e9',
+    });
+
+    await Notifications.setNotificationChannelAsync(FOLLOW_UP_CHANNEL_ID, {
+      name: 'Follow-up Reminders',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'reminder.wav',
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#0ea5e9',
+      enableLights: true,
+      enableVibrate: true,
     });
   }
 

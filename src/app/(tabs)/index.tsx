@@ -1,17 +1,23 @@
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useAuth } from '../../context/AuthContext';
+import { Alert } from 'react-native';
 import { AppText } from '../../components/AppText';
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Users, CalendarClock, UserPlus, CheckCircle, TrendingUp, Clock, ChevronRight, Menu, Bell } from 'lucide-react-native';
+import { Users, CalendarClock, UserPlus, CheckCircle, TrendingUp, Clock, ChevronRight, Menu, Bell, LogOut } from 'lucide-react-native';
 import { useLeadStore } from '../../store/leadStore';
 import { MetricCard } from '../../components/MetricCard';
-import { useRouter, useNavigation } from 'expo-router';
+import { useRouter, useNavigation, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeStore } from '../../store/themeStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { useSyncStore } from '../../store/syncStore';
 import { Colors } from '../../theme/colors';
 import { Cloud, CloudOff, RefreshCw, CheckCircle2 } from 'lucide-react-native';
+import { TeamView } from '../../components/TeamView';
+import { MarksProgress } from '../../components/MarksProgress';
+import { useNotificationStore } from '../../store/notificationStore';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -20,25 +26,149 @@ export default function Dashboard() {
   const { leads, followUps, deals, fetchLeads } = useLeadStore();
   const { mode } = useThemeStore();
   const theme = useAppTheme();
+  const { user, role, logout, userData } = useAuth();
   const insets = useSafeAreaInsets();
   const { syncStatus, pendingOperations } = useSyncStore();
+  const { dashboardMode, setDashboardMode } = useSettingsStore();
+  const { unreadCount, subscribeToNotifications, syncDueReminders } = useNotificationStore();
+
+  const activeTab = role === 'admin' ? dashboardMode : 'personal';
+  const [adminTeamName, setAdminTeamName] = React.useState('My Team');
+
+  React.useLayoutEffect(() => {
+    const isTeamMode = role === 'admin' && activeTab === 'team';
+    navigation.setOptions({
+      tabBarStyle: isTeamMode
+        ? { display: 'none' }
+        : {
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            borderTopWidth: 0,
+            elevation: 0,
+            height: 80,
+            backgroundColor: mode === 'dark' ? 'rgba(15, 23, 42, 0.75)' : 'rgba(255, 255, 255, 0.75)',
+          },
+    });
+  }, [navigation, role, activeTab, mode]);
+
+  React.useEffect(() => {
+    if (role === 'admin' && userData?.teamId) {
+      import('firebase/firestore').then(({ doc, getDoc }) => {
+        import('../../config/firebase').then(({ db }) => {
+          getDoc(doc(db, 'teams', userData.teamId)).then((snap) => {
+            if (snap.exists()) setAdminTeamName(snap.data().name);
+          });
+        });
+      });
+    }
+  }, [role, userData]);
+
+  
+  const handleLogout = () => {
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Sign out', 
+        style: 'destructive',
+        onPress: () => {
+          logout().then(() => {
+            useLeadStore.getState().clearData();
+          });
+        }
+      }
+    ]);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchLeads();
+    }, [user])
+  );
 
   useEffect(() => {
-    fetchLeads(); // Fetch from store
-  }, []);
+    if (user) {
+      fetchLeads();
+    }
+  }, [user]);
 
-  const today = new Date().toISOString().split('T')[0];
-  const totalLeads = leads.length || 0;
-  
-  const latestFollowUps = leads.map(lead => followUps.find(f => f.lead_id === lead.id)).filter(Boolean);
-  
-  const dueTodayCount = latestFollowUps.filter(f => f.next_follow_up_date === today).length || 0;
-  const completedTodayCount = followUps.filter(f => f.created_at?.startsWith(today) || f.visit_date === today).length || 0;
-  
-  const upcomingFollowUps = latestFollowUps.filter(f => f.next_follow_up_date && f.next_follow_up_date > today).length || 0;
-  
-  const freshCustomers = leads.filter(l => l.customer_type === 'Fresh Lead' || l.customer_type === 'Fresh' || (l.customer_type as any) === 'Fresh ').length || 0;
-  const closedDeals = deals.filter(d => d.deal_status === 'Won').length || 0;
+  useEffect(() => {
+    if (user?.uid) {
+      const unsubscribe = subscribeToNotifications(user.uid);
+      return () => unsubscribe();
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (user?.uid && leads.length > 0) {
+      syncDueReminders(leads, followUps, user.uid);
+    }
+  }, [user?.uid, leads, followUps]);
+
+  const { dueTodayCount, completedTodayCount, upcomingFollowUps, freshCustomers, closedDeals, totalLeads } = React.useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const total = leads.length;
+
+    // Fast O(1) map for lead follow-ups
+    const followUpByLead = new Map();
+    for (let i = 0; i < followUps.length; i++) {
+      const f = followUps[i];
+      if (!followUpByLead.has(f.lead_id)) {
+        followUpByLead.set(f.lead_id, f);
+      }
+    }
+
+    let completedToday = 0;
+    let dueToday = 0;
+    let upcoming = 0;
+    let fresh = 0;
+    let wonDeals = 0;
+
+    for (let i = 0; i < leads.length; i++) {
+      const lead = leads[i];
+      const isDealClosed = lead.status === 'Deal Closed' || deals.some(d => d.lead_id === lead.id && d.deal_status === 'Won');
+      
+      if (isDealClosed) {
+        wonDeals++;
+      }
+
+      const custType = lead.customer_type as any;
+      if (custType === 'Fresh Lead' || custType === 'Fresh' || custType?.trim() === 'Fresh') {
+        fresh++;
+      }
+      
+      if (!isDealClosed) {
+        const f = followUpByLead.get(lead.id);
+        if (f && f.next_follow_up_date) {
+          if (f.next_follow_up_date === today) {
+            dueToday++;
+          } else if (f.next_follow_up_date > today) {
+            upcoming++;
+          }
+        }
+      }
+
+      const hasCompletedToday = followUps.some(f => 
+        f.lead_id === lead.id && 
+        (f.created_at?.startsWith(today) || f.visit_date === today) && 
+        !f.is_initial &&
+        !f.comment?.startsWith('Deal Completed')
+      );
+      if (hasCompletedToday) {
+        completedToday++;
+      }
+    }
+
+    return {
+      dueTodayCount: dueToday,
+      completedTodayCount: completedToday,
+      upcomingFollowUps: upcoming,
+      freshCustomers: fresh,
+      closedDeals: wonDeals,
+      totalLeads: total,
+    };
+  }, [leads, followUps, deals]);
 
   const headerBackgroundOpacity = scrollY.interpolate({
     inputRange: [0, 80],
@@ -55,81 +185,102 @@ export default function Dashboard() {
         >
           <Menu size={24} color={theme.text} />
         </TouchableOpacity>
-        
         <View style={styles.headerTextContainer}>
-          <AppText style={[styles.headerTitle, { color: theme.text }]}>POOROJ</AppText>
+          <AppText style={[styles.headerTitle, { color: theme.text }]}>
+            {role === 'admin' ? adminTeamName : (userData?.name || 'My Dashboard')}
+          </AppText>
         </View>
-        
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.notificationButton} 
+            onPress={() => router.push('/notifications' as any)}
+            activeOpacity={0.7}
+          >
+            <Bell size={24} color={theme.text} />
+            {unreadCount > 0 && (
+              <View style={[styles.notificationBadge, { borderColor: theme.surface }]}>
+                <AppText style={styles.badgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </AppText>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={{ padding: 6 }} onPress={handleLogout} activeOpacity={0.7}>
+            <LogOut size={22} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
-        showsVerticalScrollIndicator={false}
-        onScroll={(e) => {
-          scrollY.setValue(e.nativeEvent.contentOffset.y);
-        }}
-        scrollEventThrottle={16}
-      >
-        <LinearGradient
-          colors={[mode === 'dark' ? 'rgba(2, 132, 199, 0.15)' : 'rgba(2, 132, 199, 0.08)', 'transparent']}
-          style={styles.headerGradient}
-        />
-
-        <View style={styles.metricsGrid}>
-          <AppText style={[styles.sectionTitle, { color: theme.text, width: '100%', marginBottom: 12, marginTop: 0 }]}>Today's Tasks</AppText>
-          <MetricCard title="Follow-ups Due Today" value={dueTodayCount} icon={CalendarClock} color="#d97706" onPress={() => router.push('/search?filter=today')} />
-          <MetricCard title="Follow-ups Completed Today" value={completedTodayCount} icon={CheckCircle} color="#10b981" onPress={() => router.push('/search?filter=completed')} />
-          
-          <AppText style={[styles.sectionTitle, { color: theme.text, width: '100%', marginBottom: 12, marginTop: 8 }]}>Overview</AppText>
-          <MetricCard title="Upcoming Follow-ups" value={upcomingFollowUps} icon={CalendarClock} color={theme.primary} onPress={() => router.push('/search?filter=upcoming')} />
-          <MetricCard title="Fresh Customers" value={freshCustomers} icon={UserPlus} color="#059669" onPress={() => router.push('/search?filter=fresh')} />
-          <MetricCard title="Closed Deals" value={closedDeals} icon={CheckCircle} color="#7c3aed" onPress={() => router.push('/search?filter=closed')} />
-          <MetricCard title="Total Leads" value={totalLeads} icon={Users} color={theme.primaryDark} onPress={() => router.push('/search?filter=total')} />
+      {/* Admin Toggle: Personal | Team */}
+      {role === 'admin' && (
+        <View style={{ paddingHorizontal: 24, paddingTop: 16 }}>
+          <View style={[styles.toggleContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <TouchableOpacity 
+              style={[styles.toggleButton, activeTab === 'personal' && { backgroundColor: theme.primary }]}
+              onPress={() => setDashboardMode('personal')}
+            >
+              <AppText style={{ color: activeTab === 'personal' ? '#fff' : theme.textSecondary, fontWeight: '600' }}>
+                Personal
+              </AppText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.toggleButton, activeTab === 'team' && { backgroundColor: theme.primary }]}
+              onPress={() => setDashboardMode('team')}
+            >
+              <AppText style={{ color: activeTab === 'team' ? '#fff' : theme.textSecondary, fontWeight: '600' }}>
+                Team
+              </AppText>
+            </TouchableOpacity>
+          </View>
         </View>
+      )}
 
-        <View style={styles.recentSection}>
-          <AppText style={[styles.sectionTitle, { color: theme.text, marginBottom: 12 }]}>Recent Leads</AppText>
-          {leads.length > 0 ? (
-            leads.slice(0, 3).map((lead) => (
-              <TouchableOpacity 
-                key={lead.id} 
-                style={[styles.leadCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                onPress={() => router.push(`/lead/${lead.id}`)}
-              >
-                <View style={styles.leadInfo}>
-                  <AppText style={[styles.leadName, { color: theme.text }]}>{lead.name}</AppText>
-                  <AppText style={[styles.leadStatus, { color: theme.textSecondary }]}>{lead.status}</AppText>
-                </View>
-                <ChevronRight size={20} color={theme.textSecondary} />
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={{ padding: 24, alignItems: 'center', backgroundColor: theme.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.border, marginTop: 4 }}>
-              <Users size={32} color={theme.icon} style={{ marginBottom: 12 }} />
-              <AppText style={{ fontSize: 16, color: theme.textSecondary, fontWeight: '500', marginBottom: 16 }}>No recent leads yet</AppText>
-              <TouchableOpacity 
-                style={{ backgroundColor: theme.primaryDark, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 }}
-                onPress={() => router.push('/lead/new')}
-              >
-                <AppText style={{ color: '#fff', fontWeight: '600' }}>Add Lead</AppText>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </ScrollView>
-
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={() => router.push('/lead/new')}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={[theme.primary, theme.primaryDark]}
-          style={styles.fabGradient}
+      {activeTab === 'team' && role === 'admin' ? (
+        <TeamView />
+      ) : (
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          onScroll={(e) => {
+            scrollY.setValue(e.nativeEvent.contentOffset.y);
+          }}
+          scrollEventThrottle={16}
         >
-          <UserPlus size={24} color="#ffffff" />
-        </LinearGradient>
-      </TouchableOpacity>
+          <LinearGradient
+            colors={[mode === 'dark' ? 'rgba(2, 132, 199, 0.15)' : 'rgba(2, 132, 199, 0.08)', 'transparent']}
+            style={styles.headerGradient}
+          />
+
+          <View style={styles.metricsGrid}>
+            <AppText style={[styles.sectionTitle, { color: theme.text, width: '100%', marginBottom: 12, marginTop: 0 }]}>Today's Tasks</AppText>
+            <MetricCard title="Follow-ups Due Today" value={dueTodayCount} icon={CalendarClock} color="#d97706" onPress={() => router.push('/search?filter=today')} />
+            <MetricCard title="Follow-ups Completed Today" value={completedTodayCount} icon={CheckCircle} color="#10b981" onPress={() => router.push('/search?filter=completed')} />
+            
+            <AppText style={[styles.sectionTitle, { color: theme.text, width: '100%', marginBottom: 12, marginTop: 8 }]}>Overview</AppText>
+            <MetricCard title="Upcoming Follow-ups" value={upcomingFollowUps} icon={CalendarClock} color={theme.primary} onPress={() => router.push('/search?filter=upcoming')} />
+            <MetricCard title="Fresh Customers" value={freshCustomers} icon={UserPlus} color="#059669" onPress={() => router.push('/search?filter=fresh')} />
+            <MetricCard title="Deals Completed" value={closedDeals} icon={CheckCircle} color="#7c3aed" onPress={() => router.push('/search?filter=closed')} />
+            <MetricCard title="Total Leads" value={totalLeads} icon={Users} color={theme.primaryDark} onPress={() => router.push('/search?filter=total')} />
+          </View>
+          
+          <MarksProgress scope="personal" />
+        </ScrollView>
+      )}
+
+      {activeTab === 'personal' && (
+        <TouchableOpacity 
+          style={styles.fab} 
+          onPress={() => router.push('/lead/new')}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={[theme.primary, theme.primaryDark]}
+            style={styles.fabGradient}
+          >
+            <UserPlus size={24} color="#ffffff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -137,6 +288,18 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 2,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
   },
   headerGradient: {
     position: 'absolute',
@@ -176,7 +339,7 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 6,
   },
   syncBadge: {
     paddingHorizontal: 8,
@@ -187,19 +350,30 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   notificationButton: {
-    padding: 8,
-    marginRight: -8,
+    padding: 6,
     position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   notificationBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 0,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
     backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1.5,
+    zIndex: 10,
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   metricsGrid: {
     flexDirection: 'row',

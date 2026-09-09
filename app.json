@@ -23,15 +23,33 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/pooraj-icon.png",
+          "image": "./assets/images/splash.png",
           "resizeMode": "contain",
           "dark": {
             "backgroundColor": "#FFFFFF",
-            "image": "./assets/images/pooraj-icon.png"
+            "image": "./assets/images/splash.png"
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow POOROJ to access your contacts to quickly find and select saved contacts locally on this device."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/pooraj-icon.png",
+          "color": "#0ea5e9",
+          "sounds": ["./assets/sounds/reminder.wav"]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
